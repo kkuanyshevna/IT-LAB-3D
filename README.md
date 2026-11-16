@@ -96,7 +96,7 @@ npm start
 | `computer.html`, `viewer-data.js`, `worker/` | Файлы, которые создаёт сборка |
 | `docs/` | Презентация, описание проекта и изображения |
 
-**[Скачать презентацию](docs/IT-Lab-3D-presentation.pptx)** · **[Описание проекта](docs/PROJECT.md)**
+**[Скачать презентацию](docs/IT-Lab-3D-presentation.pptx)** · **[Описание проекта](docs/PROJECT.md)** · **[Паспорт проекта и задания MVP](docs/PASSPORT-MVP.md)** · **[Паспорт и задания в PDF](docs/IT-Lab-3D-passport-MVP.pdf)**
 
 ## Ограничения
 
