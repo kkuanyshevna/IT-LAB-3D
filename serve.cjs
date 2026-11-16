@@ -1,0 +1,7 @@
+const http=require('node:http'),fs=require('node:fs'),path=require('node:path');const{pathToFileURL}=require('node:url');
+const root=__dirname,localEnv=path.join(root,'.env.local');
+if(fs.existsSync(localEnv)){if(typeof process.loadEnvFile!=='function')throw Error('Для .env.local нужен Node.js 20.12 или новее');process.loadEnvFile(localEnv);}
+const port=Number(process.env.ITLAB_PORT||4317);let worker,modified=0;
+async function currentWorker(){const file=path.join(root,'worker/index.js'),stamp=fs.statSync(file).mtimeMs;if(stamp!==modified){worker=(await import(pathToFileURL(file).href+'?revision='+stamp)).default;modified=stamp;}return worker;}
+const server=http.createServer(async(req,res)=>{try{const parts=[];let size=0;for await(const part of req){size+=part.length;if(size>20*1024){res.writeHead(413);res.end('Request too large');return;}parts.push(part);}const origin='http://127.0.0.1:'+port;const request=new Request(origin+req.url,{method:req.method,headers:req.headers,body:['GET','HEAD'].includes(req.method)?undefined:Buffer.concat(parts)});const response=await(await currentWorker()).fetch(request,{OPENAI_API_KEY:process.env.OPENAI_API_KEY,OPENAI_MODEL:process.env.OPENAI_MODEL});res.writeHead(response.status,Object.fromEntries(response.headers));res.end(Buffer.from(await response.arrayBuffer()));}catch{res.writeHead(500);res.end('Local preview error');}});
+server.listen(port,'127.0.0.1',()=>console.log('IT Lab 3D: http://127.0.0.1:'+port));
