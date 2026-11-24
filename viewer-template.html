@@ -119,7 +119,7 @@ renderer.domElement.addEventListener('pointerup',event=>{
  const moved=Math.hypot(event.clientX-down.x,event.clientY-down.y);down=null;
  if(moved>7)return;
  const r=renderer.domElement.getBoundingClientRect();pointer.set((event.clientX-r.left)/r.width*2-1,-(event.clientY-r.top)/r.height*2+1);
- raycaster.setFromCamera(pointer,camera);const hit=raycaster.intersectObjects(parts,true).find(h=>meshToPart.has(h.object));
+ raycaster.setFromCamera(pointer,camera);const hit=raycaster.intersectObjects(parts.filter(part=>part.visible),true).find(hit=>{const part=meshToPart.get(hit.object);if(!part)return false;for(let node=hit.object;node;node=node.parent){if(!node.visible)return false;if(node===part)return true;}return false;});
  if(hit)select(meshToPart.get(hit.object));
 });
 function select(group){

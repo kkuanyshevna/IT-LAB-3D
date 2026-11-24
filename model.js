@@ -16,12 +16,12 @@
   function rounded(g,x,y,z,w,h,d,m,r=.05){const shape=new THREE.Shape();const a=-w/2,b=-h/2;shape.moveTo(a+r,b);shape.lineTo(a+w-r,b);shape.quadraticCurveTo(a+w,b,a+w,b+r);shape.lineTo(a+w,b+h-r);shape.quadraticCurveTo(a+w,b+h,a+w-r,b+h);shape.lineTo(a+r,b+h);shape.quadraticCurveTo(a,b+h,a,b+h-r);shape.lineTo(a,b+r);shape.quadraticCurveTo(a,b,a+r,b);const geometry=new THREE.ExtrudeGeometry(shape,{depth:d,bevelEnabled:true,bevelSegments:1,steps:1,bevelSize:Math.min(.015,d/4),bevelThickness:Math.min(.015,d/4),curveSegments:3});geometry.translate(0,0,-d/2);const mesh=new THREE.Mesh(geometry,m);mesh.position.set(x,y,z);g.add(mesh);return mesh;}
   function label(g,text,x,y,z,w,h,materialColor='#c5d4d6',rotation=0){const c=document.createElement('canvas');c.width=512;c.height=128;const ctx=c.getContext('2d');ctx.fillStyle='#111a1b';ctx.fillRect(0,0,512,128);ctx.fillStyle=materialColor;ctx.font='bold 44px Arial';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(text,256,64,495);const tex=new THREE.CanvasTexture(c);tex.colorSpace=THREE.SRGBColorSpace;const mesh=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({map:tex,side:THREE.DoubleSide}));mesh.position.set(x,y,z);mesh.rotation.x=rotation;g.add(mesh);return mesh;}
   function screw(g,x,y,z,axis='z'){cyl(g,x,y,z,.043,.032,silver,axis,12);if(axis==='z'){box(g,x,y,z+.02,.045,.008,.003,black);box(g,x,y,z+.021,.008,.045,.003,black);}}
-  const spins=[];
+  const spins=[],fanAssemblies=new Map();
   function fan(parent,x,y,z,size=1,axis='z',rim=green){const g=group();parent.add(g);g.position.set(x,y,z);if(axis==='x')g.rotation.y=Math.PI/2;if(axis==='y')g.rotation.x=-Math.PI/2;const r=size/2;
    ring(g,0,0,0,r-.045,.043,plastic);ring(g,0,0,.045,r-.083,.015,rim);ring(g,0,0,-.045,r-.075,.012,steel);
    for(let i=0;i<4;i++){const a=i*Math.PI/2+.45;const strut=box(g,Math.cos(a)*r*.5,Math.sin(a)*r*.5,-.06,r*.76,.035,.035,black);strut.rotation.z=a;}
    const blades=group();g.add(blades);const shape=new THREE.Shape();shape.moveTo(r*.18,-r*.035);shape.bezierCurveTo(r*.42,-r*.04,r*.65,-r*.22,r*.90,-r*.20);shape.bezierCurveTo(r*.98,-r*.07,r*.90,r*.04,r*.77,r*.10);shape.bezierCurveTo(r*.60,r*.16,r*.33,r*.13,r*.18,r*.05);shape.closePath();const geometry=new THREE.ExtrudeGeometry(shape,{depth:.025,bevelEnabled:false,curveSegments:6});batch(blades,geometry,plastic,Array.from({length:9},(_,i)=>({p:[0,0,0],r:[.10,0,i*Math.PI*2/9]})));
-   cyl(blades,0,0,.032,r*.21,.095,plastic,'z');cyl(blades,0,0,.085,r*.115,.012,steel,'z');ring(blades,0,0,.09,r*.16,.005,silver);spins.push(blades);
+   cyl(blades,0,0,.032,r*.21,.095,plastic,'z');cyl(blades,0,0,.085,r*.115,.012,steel,'z');ring(blades,0,0,.09,r*.16,.005,silver);spins.push(blades);fanAssemblies.set(blades,parent);
    for(let ix of [-1,1])for(let iy of [-1,1]){rounded(g,ix*(r-.04),iy*(r-.04),-.025,.12,.12,.09,black,.025);screw(g,ix*(r-.04),iy*(r-.04),.04);}return g;}
   const registry={};
   const microParts=__MICRO_DATA__;
@@ -30,7 +30,7 @@
    // Combining the other meshes keeps added detail inexpensive to draw.
    g.updateMatrixWorld(true);const inverse=g.matrixWorld.clone().invert(),byMaterial=new Map();
    g.traverse(node=>{if(!node.isMesh||node.isInstancedMesh||Array.isArray(node.material)||node.userData.inspectionCover)return;
-    let ancestor=node;while(ancestor&&ancestor!==g){if(spins.includes(ancestor))return;ancestor=ancestor.parent;}
+    let ancestor=node;while(ancestor&&ancestor!==g){if(spins.includes(ancestor)||ancestor.userData.serviceAssembly)return;ancestor=ancestor.parent;}
     if(Math.abs(node.position.y-.75)<.01&&Math.abs(node.position.z-1.31)<.01)return;
     const list=byMaterial.get(node.material)||[];list.push(node);byMaterial.set(node.material,list);
    });
@@ -46,6 +46,11 @@
   const register=(name,info,g,explode,anchor)=>{if(name!=='Сетевой кабель')mergeStatic(g);registry[name]=g;addPart({name,info,group:g,explode,anchor});return g;};
   // Chassis: open side, continuous steel members, panel seams, vents and feet.
   const chassis=group();
+  const caseFans=group();caseFans.userData.serviceAssembly=true;
+  caseFans.userData.model={base:caseFans.position.clone()};
+  objectRoot.add(caseFans);
+  // Standoffs remain in an empty case and line up with the model's ATX mounting holes.
+  for(const x of [-1.38,1.27])for(const y of [1.48,3.35,5.17])cyl(chassis,x,y,-1.075,.049,.11,gold,'z',6);
   box(chassis,0,.08,0,3.35,.13,2.86,black);box(chassis,0,5.65,0,3.35,.12,2.86,black);
   box(chassis,0,2.85,-1.39,3.35,5.5,.08,steel);
   for(const x of [-1.62,1.62])for(const z of [-1.36,1.36])box(chassis,x,2.85,z,.09,5.55,.09,steel);
@@ -56,12 +61,12 @@
   for(const x of [-1.2,1.2])for(const z of [-.98,.98])box(chassis,x,-.04,z,.32,.17,.4,plastic);
   for(let i=0;i<15;i++)box(chassis,-1.32+i*.19,5.72,-.08,.055,.014,1.75,dark);
   box(chassis,1.67,2.88,-1.2,.06,5.4,.2,steel);box(chassis,1.67,2.88,1.2,.06,5.4,.2,steel);
-  for(const y of [1.9,3.15,4.4])fan(chassis,1.63,y,0,1.11,'x',green);
+  for(const y of [1.9,3.15,4.4])fan(caseFans,1.63,y,0,1.11,'x',green);
   for(let i=0;i<13;i++)box(chassis,1.77,2.88,-1.08+i*.18,.025,5.35,.017,dark);
   cyl(chassis,1.1,5.73,.9,.095,.025,silver);box(chassis,.7,5.73,.92,.25,.015,.09,blue);box(chassis,.28,5.73,.92,.25,.015,.09,blue);
   for(let i=0;i<7;i++){box(chassis,-1.68,1.62+i*.16,.45,.035,.105,1.4,steel);for(let j=0;j<5;j++)box(chassis,-1.703,1.62+i*.16,-.08+j*.2,.008,.045,.12,black);}
   // Rear exhaust, rolled frame edges and removable fan-filter mesh.
-  fan(chassis,-1.63,4.66,.48,1.15,'x',steel);
+  fan(caseFans,-1.63,4.66,.48,1.15,'x',steel);
   for(const r of [.14,.24,.34,.44,.53])ring(chassis,-1.735,4.66,.48,r,.009,steel,'x');
   const rearStruts=[];for(let i=0;i<8;i++){const a=i*Math.PI/4;rearStruts.push({p:[-1.75,4.66+Math.cos(a)*.28,.48+Math.sin(a)*.28],r:[a,0,0]});}batch(chassis,new THREE.BoxGeometry(.016,.58,.014),steel,rearStruts);
   const frontMesh=[];for(let y=0;y<39;y++)for(let z=0;z<15;z++)if((y+z)%2===0)frontMesh.push({p:[1.794,.48+y*.132,-1.03+z*.145]});batch(chassis,new THREE.BoxGeometry(.008,.024,.065),black,frontMesh);
@@ -120,9 +125,10 @@
   for(const x of [-1.38,1.27])for(const y of [1.48,3.35,5.17]){cyl(board,x,y,-.91,.065,.035,gold,'z');screw(board,x,y,-.87);}
   // Socket retention plate and lever remain visible in the exploded model.
   box(board,-.4,4.03,-.88,.99,1.04,.06,silver);box(board,-.4,4.03,-.835,.82,.86,.04,black);
-  for(const x of [-.88,.08])box(board,x,4.03,-.79,.055,1.02,.035,silver);
-  box(board,-.4,4.53,-.79,1.0,.05,.035,silver);box(board,-.4,3.53,-.79,1.0,.05,.035,silver);
-  tube(board,[[.15,4.55,-.75],[.18,4.0,-.75],[.18,3.53,-.75],[.3,3.45,-.69]],.018,silver);
+  const socketPlate=group();socketPlate.position.set(.15,4.03,-.79);socketPlate.userData.serviceAssembly=true;board.add(socketPlate);
+  for(const x of [-1.03,-.07])box(socketPlate,x,0,0,.055,1.02,.035,silver);
+  for(const y of [-.5,.5])box(socketPlate,-.55,y,0,1.0,.05,.035,silver);
+  tube(socketPlate,[[0,.52,.04],[.03,-.03,.04],[.03,-.5,.04],[.15,-.58,.10]],.018,silver);
   const socketPins=[];for(let y=0;y<13;y++)for(let x=0;x<13;x++)if(!(x>3&&x<9&&y>3&&y<9))socketPins.push({p:[-.72+x*.053,3.7+y*.053,-.802],r:[Math.PI/2,0,0]});batch(board,new THREE.CylinderGeometry(.008,.008,.019,5),gold,socketPins);
   // Four DIMM slots, individual latch details.
   for(const x of [.4,.61,.82,1.03]){box(board,x,4.02,-.855,.11,1.64,.2,black);box(board,x,4.02,-.74,.022,1.45,.025,dark);for(const y of [3.16,4.88])box(board,x,y,-.72,.15,.14,.13,silver);}
@@ -222,6 +228,7 @@
   label(board,'CR2032',-.6,1.91,-.754,.24,.06);box(board,-.6,2.055,-.729,.15,.045,.015,steel);
   register('Материнская плата','Основа системы: соединяет процессор, память, накопители и периферию. Видны сокет CPU, четыре слота DIMM с защёлками, PCIe, M.2, задние порты, SATA, питание ATX и батарейка часов. Конкретная разводка зависит от модели платы.',board,[-2.6,.12,-.05],[-1.3,5.25,-.9]);
   const cpu=group();box(cpu,-.4,4.03,-.74,.73,.76,.055,pcb);box(cpu,-.4,4.03,-.68,.63,.65,.07,silver);label(cpu,'CPU',-.4,4.05,-.638,.48,.15);label(cpu,'6 CORE',-.4,3.87,-.638,.43,.09);register('Процессор','CPU выполняет инструкции программы. Он обменивается данными с оперативной памятью через контроллер памяти. Металлическая крышка передаёт тепло кулеру; процессор не является долговременным хранилищем файлов.',cpu,[-1.15,.7,1.5],[-.4,4.44,-.62]);
+  const pasteDot=cyl(cpu,-.4,4.03,-.632,.087,.025,M(0x9aa5ab,.22,.58),'z');pasteDot.visible=false;pasteDot.raycast=()=>{};
   const cooling=group();box(cooling,-.4,4.03,-.57,.64,.65,.12,copper);
   for(let i=0;i<20;i++)box(cooling,-.4,3.52+i*.052,-.13,1.1,.018,.75,silver);
   for(const x of [-.7,-.5,-.3,-.1])tube(cooling,[[x,3.49,-.5],[x,3.38,-.08],[x,3.56,.18],[x,4.5,.18]],.035,copper);
@@ -260,11 +267,27 @@
   const psuPins=[];for(let row=0;row<2;row++)for(let i=0;i<12;i++)psuPins.push({p:[-1.14+i*.12,.42+row*.09,1.115]});batch(psu,new THREE.BoxGeometry(.068,.055,.014),dark,psuPins);label(psu,'MODULAR DC',-.48,.99,1.115,1.2,.1);
   box(psu,-1.534,.83,-.22,.012,.11,.04,black);box(psu,-1.53,.89,-.22,.013,.012,.055,silver);
   register('Блок питания','Блок питания преобразует сетевое питание в напряжения, необходимые компонентам. Номинальная мощность сама по себе не определяет качество или совместимость. В тренажёре блок показан закрытым: внутреннее устройство не обслуживается.',psu,[-1.15,-.1,.7],[-.5,1.24,1.13]);
-  const power=group();for(let i=0;i<8;i++)tube(power,[[.4+i*.033,1.32,-.7],[1.31,1.65,-.68+i*.033],[1.37,2.4,-.65+i*.033],[1.28,2.83+i*.052,-.55]],.016,i%4===0?steel:black);for(let i=0;i<4;i++)tube(power,[[-1.25+i*.04,1.32,-1.13],[-1.36+i*.02,3.2,-1.12],[-1.26+i*.02,4.9,-.95],[-.98+i*.055,5.09,-.8]],.019,black);for(let i=0;i<4;i++)tube(power,[[.85+i*.045,1.3,-.2],[1.24,1.8,.23+i*.04],[1.23,2.35,.39+i*.04],[.99,2.82+i*.026,.2]],.02,i===0?steel:black);
-  for(const y of [1.82,2.37]){box(power,1.37,y,-.535,.095,.07,.36,plastic);box(power,1.27,y,.44,.13,.07,.23,plastic);}
-  box(power,1.282,3.04,-.57,.18,.8,.15,black);box(power,1.39,3.04,-.57,.04,.21,.14,steel);label(power,'ATX',1.292,3.04,-.486,.12,.35).rotation.z=Math.PI/2;
-  rounded(power,-.89,5.09,-.735,.27,.18,.11,black,.02);rounded(power,1.0,2.86,.24,.23,.19,.14,black,.02);
-  for(const [x,y,z]of[[1.38,1.53,-.85],[1.38,3.55,-.86],[-1.3,2.4,-1.1]]){box(power,x,y,z,.075,.09,.34,steel);screw(power,x,y,z+.18);}
+  const power=group();
+  const harness=Object.fromEntries(['atx','eps','gpu','cpuFan','sysFan','frontPanel','monitor','mains'].map(key=>{
+   const wire=group();wire.userData.serviceAssembly=true;power.add(wire);return [key,wire];
+  }));
+  for(let i=0;i<8;i++)tube(harness.atx,[[.4+i*.033,1.32,-.7],[1.31,1.65,-.68+i*.033],[1.37,2.4,-.65+i*.033],[1.28,2.83+i*.052,-.55]],.016,i%4===0?steel:black);
+  for(let i=0;i<4;i++)tube(harness.eps,[[-1.25+i*.04,1.32,-1.13],[-1.36+i*.02,3.2,-1.12],[-1.26+i*.02,4.9,-.95],[-1.18+i*.055,5.14,-.73]],.019,black);
+  for(let i=0;i<4;i++)tube(harness.gpu,[[.85+i*.045,1.3,-.2],[1.24,1.8,.23+i*.04],[1.23,2.35,.39+i*.04],[.99,2.82+i*.026,.2]],.02,i===0?steel:black);
+  for(const y of [1.82,2.37]){box(harness.atx,1.37,y,-.535,.095,.07,.36,plastic);box(harness.gpu,1.27,y,.44,.13,.07,.23,plastic);}
+  box(harness.atx,1.282,3.04,-.57,.18,.8,.15,black);box(harness.atx,1.39,3.04,-.57,.04,.21,.14,steel);label(harness.atx,'ATX',1.292,3.04,-.486,.12,.35).rotation.z=Math.PI/2;
+  rounded(harness.eps,-1.18,5.16,-.715,.32,.17,.11,black,.02);rounded(harness.gpu,1.0,2.86,.24,.23,.19,.14,black,.02);
+  const fanWire=M(0x67b7bf,.16,.66),signalWire=M(0x91ab69,.2,.6);
+  tube(harness.cpuFan,[[.03,4.22,.35],[.24,4.55,.06],[.44,5.2,-.47],[.92,5.12,-.69]],.022,fanWire);
+  box(harness.cpuFan,.92,5.12,-.69,.25,.095,.12,plastic);
+  tube(harness.sysFan,[[1.65,3.14,-.35],[1.44,2.45,-.5],[.91,1.61,-.58],[.63,1.5,-.72]],.018,fanWire);
+  box(board,.63,1.5,-.87,.16,.08,.12,plastic);
+  label(board,'SYS_FAN',.64,1.39,-.943,.27,.04);
+  tube(harness.frontPanel,[[1.09,5.61,.92],[1.45,4.2,-.32],[1.39,1.27,-.6],[.18,1.52,-.72]],.021,signalWire);
+  box(harness.frontPanel,.18,1.52,-.69,.18,.068,.1,plastic);
+  tube(harness.monitor,[[-1.59,2.8,.25],[-1.97,2.64,.28],[-2.25,1.14,.33],[-2.65,.22,.82],[-3.27,.17,1.27]],.026,blue);
+  tube(harness.mains,[[-1.54,.83,-.22],[-1.87,.75,-.27],[-1.99,.23,-.25],[-2.56,.16,-.03]],.033,plastic);
+  for(const [x,y,z]of[[1.38,1.53,-.85],[1.38,3.55,-.86],[-1.3,2.4,-1.1]]){box(harness.atx,x,y,z,.075,.09,.34,steel);screw(harness.atx,x,y,z+.18);}
   register('Кабели питания','Разные кабели питают плату, CPU и видеокарту. Разъёмы ATX, EPS и PCIe имеют разное назначение: внешне похожие кабели нельзя считать взаимозаменяемыми. Виртуальная практика здесь не заменяет руководство конкретного оборудования.',power,[.8,0,-.4],[1.3,3.05,-.45]);
   // Router: tapered appearance via stacked surfaces, vents, port recesses and antennas.
   const router=group();box(router,-4.12,.23,.13,2.15,.31,1.26,white);box(router,-4.12,.42,.13,2.06,.08,1.18,plastic);for(let i=0;i<18;i++)box(router,-5.02+i*.105,.468,.13,.026,.012,.84,steel);for(const x of [-4.93,-3.3]){cyl(router,x,.75,-.36,.048,.8,plastic);const ant=cyl(router,x,1.32,-.39,.057,.65,plastic);ant.rotation.z=x<-4?.12:-.12;}
@@ -288,18 +311,24 @@
   const state={power:false,panelOpen:false,ramInstalled:true,ssdInstalled:true,gpuInstalled:true,cableConnected:true};
   // Detached assemblies can be moved with the pointer. The parent validates a
   // drop before setState commits installation; the model never installs itself.
-  const componentNames={RAM:'Оперативная память',SSD:'SSD M.2',GPU:'Видеокарта'};
-  const componentKeys={RAM:'ramInstalled',SSD:'ssdInstalled',GPU:'gpuInstalled'};
-  const grabAnchors={RAM:new THREE.Vector3(.61,4.05,-.29),SSD:new THREE.Vector3(-.22,3.28,-.725),GPU:new THREE.Vector3(-.2,2.97,-.1)};
-  const slotAnchors={DIMM:new THREE.Vector3(.8,4.05,-.7),'M.2':new THREE.Vector3(-.22,3.28,-.8),PCIe:new THREE.Vector3(-.25,2.94,-.83)};
-  const componentCenters=Object.fromEntries(Object.entries(componentNames).map(([key,name])=>{const g=registry[name],center=new THREE.Box3().setFromObject(g).getCenter(new THREE.Vector3());return[key,g.worldToLocal(center)];}));
-  const detachedBases={RAM:new THREE.Vector3(1.75,-.35,1.9),SSD:new THREE.Vector3(2.7,-2.45,2.35),GPU:new THREE.Vector3(2.8,-1.2,1.6)};
-  let dragCamera=null,dragCanvas=document.querySelector('#stage canvas'),dragConfig={enabled:false,parts:['RAM','SSD','GPU'],showTargets:true},drag=null,dragListenersOn=false,trayNeedsLayout=true;
+  const legacyParts=['RAM','SSD','GPU'];
+  const legacySlots=['DIMM','M.2','PCIe'];
+  const componentNames={RAM:'Оперативная память',SSD:'SSD M.2',GPU:'Видеокарта',BOARD:'Материнская плата',CPU:'Процессор',COOLER:'Кулер процессора',PSU:'Блок питания',FANS:'Вентиляторы корпуса'};
+  const componentKeys={RAM:'ramInstalled',SSD:'ssdInstalled',GPU:'gpuInstalled',BOARD:'boardInstalled',CPU:'cpuInstalled',COOLER:'coolerInstalled',PSU:'psuInstalled',FANS:'fansInstalled'};
+  const componentGroups={...Object.fromEntries(Object.entries(componentNames).map(([key,name])=>[key,registry[name]])),FANS:caseFans};
+  const grabAnchors={RAM:[.61,4.05,-.29],SSD:[-.22,3.28,-.725],GPU:[-.2,2.77,.58],BOARD:[-.4,4.02,-.78],CPU:[-.4,4.03,-.64],COOLER:[-.4,4.03,.42],PSU:[-.45,.71,1.12],FANS:[1.63,3.15,0]};
+  const slotAnchors={DIMM:[.8,4.05,-.7],'M.2':[-.22,3.28,-.8],PCIe:[-.25,2.94,-.83],'ATX TRAY':[-.05,3.35,-1],LGA:[-.4,4.03,-.79],'CPU MOUNT':[-.4,4.03,-.56],'PSU BAY':[-.45,.71,.3],'FAN MOUNT':[1.63,3.15,0],'ATX 24-pin':[1.22,3.04,-.72],'EPS CPU 8-pin':[-1.18,5.16,-.77],'PCIe GPU 8-pin':[1.08,2.86,.18],CPU_FAN:[.92,5.12,-.75],SYS_FAN:[.63,1.5,-.78],F_PANEL:[.18,1.52,-.73],HDMI:[-1.59,2.8,.25]};
+  const slotOwners={'ATX TRAY':chassis,'PSU BAY':chassis,'FAN MOUNT':chassis,'PCIe GPU 8-pin':gpu,HDMI:gpu};
+  const trayScales={BOARD:.63,FANS:.58,PSU:.83,COOLER:.9};
+  const componentCenters=Object.fromEntries(Object.entries(componentGroups).map(([key,g])=>[key,g.worldToLocal(new THREE.Box3().setFromObject(g).getCenter(new THREE.Vector3()))]));
+  const detachedBases=Object.fromEntries(Object.keys(componentGroups).map(key=>[key,new THREE.Vector3(2.8,-1.2,1.6)]));
+  let dragCamera=null,dragCanvas=document.querySelector('#stage canvas'),dragConfig={enabled:false,parts:legacyParts,showTargets:true,targetSlot:null,wire:null,remove:false},drag=null,dragListenersOn=false,trayNeedsLayout=true;
   const dragRaycaster=new THREE.Raycaster(),dragPointer=new THREE.Vector2();
   const dragSlotLayer=group();objectRoot.add(dragSlotLayer);dragSlotLayer.visible=false;
-  const slotSizes={DIMM:[.62,1.78,.14],'M.2':[1.17,.36,.12],PCIe:[2.03,.2,.15]};
+  const slotSizes={DIMM:[.62,1.78,.14],'M.2':[1.17,.36,.12],PCIe:[2.03,.2,.15],'ATX TRAY':[2.92,3.96,.15],LGA:[.82,.86,.08],'CPU MOUNT':[1.15,1.05,.17],'PSU BAY':[2.02,1.03,1.95],'FAN MOUNT':[.23,3.6,1.13],'ATX 24-pin':[.3,.88,.15],'EPS CPU 8-pin':[.44,.19,.12],'PCIe GPU 8-pin':[.22,.23,.28],CPU_FAN:[.34,.15,.13],SYS_FAN:[.19,.14,.14],F_PANEL:[.48,.19,.14],HDMI:[.16,.22,.22]};
   const slotMarkers=Object.fromEntries(Object.entries(slotAnchors).map(([key,anchor])=>{
-   const marker=new THREE.Mesh(new THREE.BoxGeometry(...slotSizes[key]),new THREE.MeshBasicMaterial({color:0xe8b775,wireframe:true,transparent:true,opacity:.8,depthTest:false}));marker.renderOrder=42;marker.raycast=()=>{};marker.position.copy(anchor);dragSlotLayer.add(marker);return[key,marker];
+   const shape=new THREE.BoxGeometry(...slotSizes[key]),edges=new THREE.EdgesGeometry(shape);shape.dispose();
+   const marker=new THREE.LineSegments(edges,new THREE.LineBasicMaterial({color:0xe8b775,transparent:true,opacity:.87,depthTest:false}));marker.renderOrder=42;marker.raycast=()=>{};marker.position.set(...anchor);dragSlotLayer.add(marker);return[key,marker];
   }));
   // Tutorial overlays are schematic functional links, not electrical traces.
   let tutorialIndex=-1;
@@ -332,22 +361,43 @@
   const psuCover=chassis.children.find(n=>n.isMesh&&Math.abs(n.position.y-.75)<.01&&Math.abs(n.position.z-1.31)<.01);
   const coolingBase=cooling.position.clone();
   let lastMetrics={calls:0,triangles:0};
-  scene.onAfterRender=(renderer,renderScene,camera)=>{lastMetrics={calls:renderer.info.render.calls,triangles:renderer.info.render.triangles};dragCamera=camera;if(trayNeedsLayout)layoutDetachedTrays();};
+  const lastTrayCamera=new THREE.Vector3();
+  scene.onAfterRender=(renderer,renderScene,camera)=>{
+   lastMetrics={calls:renderer.info.render.calls,triangles:renderer.info.render.triangles};dragCamera=camera;
+   if(state.mode==='assembly'&&dragConfig.parts.some(key=>!state[componentKeys[key]])&&lastTrayCamera.distanceToSquared(camera.position)>.0002){
+    lastTrayCamera.copy(camera.position);trayNeedsLayout=true;
+   }
+   if(trayNeedsLayout)layoutDetachedTrays();
+  };
   let helper=null,focusGroup=null;
   function focus(name){if(helper){scene.remove(helper);helper.geometry.dispose();helper.material.dispose();helper=null;}const g=registry[name];if(!g)return false;focusGroup=g;helper=new THREE.BoxHelper(g,0xf4bf73);helper.material.depthTest=false;helper.renderOrder=20;scene.add(helper);document.getElementById('partName').textContent=name;document.getElementById('partInfo').textContent=g.userData.model.info;return true;}
   function setGroupBase(g,base){const d=g.userData.model;if(!d)return;const explodedOffset=g.position.clone().sub(d.base);d.base.copy(base);g.position.copy(base).add(explodedOffset);}
   function applyHardwarePoses(){
-   for(const [key,name]of Object.entries(componentNames))setGroupBase(registry[name],state[componentKeys[key]]?originalBases[name]:detachedBases[key]);
-   const panelBase=originalBases['Боковая панель'].clone();if(state.panelOpen)panelBase.add(new THREE.Vector3(1.9,.2,1.8));setGroupBase(registry['Боковая панель'],panelBase);
+   const full=state.mode==='assembly';
+   for(const [key,g] of Object.entries(componentGroups)){
+    const installed=full?state[componentKeys[key]]:!legacyParts.includes(key)||state[componentKeys[key]];
+    g.visible=!full||installed||dragConfig.parts.includes(key);
+    g.scale.setScalar(full&&!installed?(trayScales[key]||1):1);
+    setGroupBase(g,installed?(originalBases[componentNames[key]]||new THREE.Vector3()):detachedBases[key]);
+   }
+   const panelGroup=registry['Боковая панель'],panelBase=originalBases['Боковая панель'].clone();
+   if(state.panelOpen&&!full)panelBase.add(new THREE.Vector3(1.9,.2,1.8));
+   panelGroup.visible=!full||!state.panelOpen;
+   setGroupBase(panelGroup,panelBase);
+   socketPlate.rotation.y=full&&state.socketOpen?1.62:0;
+   pasteDot.visible=full&&state.paste!=='none';
+   router.visible=network.visible=!full;
+   for(const [key,wire] of Object.entries(harness))wire.visible=full?(key==='mains'?state.mains:Boolean(state.wiring?.[key])):['atx','eps','gpu'].includes(key);
   }
   function layoutDetachedTrays(force=false){
    if(!dragCamera||!dragCanvas||drag||(!force&&!trayNeedsLayout))return;
    const rect=dragCanvas.getBoundingClientRect();if(rect.width<20||rect.height<20)return;
    scene.updateMatrixWorld(true);const center=new THREE.Box3().setFromObject(chassis).getCenter(new THREE.Vector3());
    const plane=new THREE.Plane().setFromNormalAndCoplanarPoint(dragCamera.getWorldDirection(new THREE.Vector3()),center);
-   for(const [key,xy]of Object.entries({RAM:[.79,.27],GPU:[.80,.58],SSD:[.79,.83]})){
+   const trayPositions=state.mode==='assembly'?Object.fromEntries(dragConfig.parts.map(key=>[key,[.81,.43]])):{RAM:[.79,.27],GPU:[.80,.58],SSD:[.79,.83]};
+   for(const [key,xy]of Object.entries(trayPositions)){
     dragRaycaster.setFromCamera(new THREE.Vector2(xy[0]*2-1,1-xy[1]*2),dragCamera);const p=new THREE.Vector3();
-    if(dragRaycaster.ray.intersectPlane(plane,p))detachedBases[key].copy(objectRoot.worldToLocal(p)).sub(componentCenters[key]);
+    if(dragRaycaster.ray.intersectPlane(plane,p))detachedBases[key].copy(objectRoot.worldToLocal(p)).addScaledVector(componentCenters[key],-componentGroups[key].scale.x);
    }
    trayNeedsLayout=false;applyHardwarePoses();
   }
@@ -362,17 +412,20 @@
    const canvasX=(p.x+1)*rect.width/2,canvasY=(1-p.y)*rect.height/2;
    return{x:rect.left+canvasX,y:rect.top+canvasY,canvasX,canvasY,visible:p.z>=-1&&p.z<=1&&canvasX>=0&&canvasX<=rect.width&&canvasY>=0&&canvasY<=rect.height};
   }
-  function slotWorldPoint(key){return board.localToWorld(slotAnchors[key].clone());}
-  function updateSlotMarkers(){scene.updateMatrixWorld(true);for(const [key,marker]of Object.entries(slotMarkers))marker.position.copy(objectRoot.worldToLocal(slotWorldPoint(key)));}
+  function activeSlots(){return state.mode==='assembly'?[dragConfig.targetSlot].filter(Boolean):legacySlots;}
+  function slotWorldPoint(key){return (slotOwners[key]||board).localToWorld(new THREE.Vector3(...slotAnchors[key]));}
+  function updateSlotMarkers(){const slots=activeSlots();scene.updateMatrixWorld(true);for(const [key,marker]of Object.entries(slotMarkers)){marker.visible=slots.includes(key);if(marker.visible)marker.position.copy(objectRoot.worldToLocal(slotWorldPoint(key)));}}
   function getDragTargets(){
    if(!dragCamera||!dragCanvas)return{ready:false,space:'iframe-client',sources:{},targets:{}};
    scene.updateMatrixWorld(true);const rect=dragCanvas.getBoundingClientRect(),sources={},targets={};
-   for(const [key,name]of Object.entries(componentNames)){const p=projectPoint(registry[name].localToWorld(grabAnchors[key].clone()));sources[key]={...p,installed:state[componentKeys[key]],draggable:dragConfig.enabled&&dragConfig.parts.includes(key)&&!state[componentKeys[key]]};}
-   for(const key of Object.keys(slotAnchors))targets[key]=projectPoint(slotWorldPoint(key));
+   for(const key of state.mode==='assembly'?dragConfig.parts:legacyParts){const p=projectPoint(componentGroups[key].localToWorld(new THREE.Vector3(...grabAnchors[key])));sources[key]={...p,installed:state[componentKeys[key]],draggable:dragConfig.enabled&&dragConfig.parts.includes(key)&&Boolean(state[componentKeys[key]])===dragConfig.remove};}
+   for(const key of activeSlots())targets[key]=projectPoint(slotWorldPoint(key));
+   if(dragConfig.remove)targets.TRAY={x:rect.left+rect.width*.81,y:rect.top+rect.height*.43,visible:true};
    return{ready:true,space:'iframe-client',canvas:{left:rect.left,top:rect.top,width:rect.width,height:rect.height},sources,targets};
   }
   function nearestSlot(x,y){
    const data=getDragTargets();if(!data.ready)return null;const radius=Math.max(24,Math.min(48,data.canvas.width*.04));
+   if(dragConfig.remove){const p=data.targets.TRAY;return Math.abs(x-p.x)<data.canvas.width*.12&&Math.abs(y-p.y)<data.canvas.height*.15?'TRAY':null;}
    const candidates=Object.entries(data.targets).map(([key,p])=>({key,p,d:Math.hypot(x-p.x,y-p.y)})).filter(c=>c.p.visible&&c.d<radius).sort((a,b)=>a.d-b.d);
    return candidates[0]?.key||null;
   }
@@ -386,11 +439,11 @@
   function onDragDown(event){
    if(!dragConfig.enabled||!dragCamera||event.button!==0||drag)return;
    scene.updateMatrixWorld(true);pointerRay(event);const meshes=[],owners=new Map();
-   for(const key of dragConfig.parts){if(!componentNames[key]||state[componentKeys[key]])continue;const g=registry[componentNames[key]];g.traverse(n=>{if(visibleMesh(n,g)){meshes.push(n);owners.set(n,key);}});}
-   const hit=dragRaycaster.intersectObjects(meshes,false)[0];if(!hit)return;const component=owners.get(hit.object),g=registry[componentNames[component]];
+   for(const key of dragConfig.parts){if(!componentNames[key]||Boolean(state[componentKeys[key]])!==dragConfig.remove)continue;const g=componentGroups[key];g.traverse(n=>{if(!n.userData.microPick&&visibleMesh(n,g)){meshes.push(n);owners.set(n,key);}});}
+   const hit=dragRaycaster.intersectObjects(meshes,false)[0];if(!hit)return;const component=owners.get(hit.object),g=componentGroups[component];
    stopPointer(event);const plane=new THREE.Plane().setFromNormalAndCoplanarPoint(dragCamera.getWorldDirection(new THREE.Vector3()),hit.point);
    drag={component,group:g,base:g.userData.model.base.clone(),plane,startLocal:objectRoot.worldToLocal(hit.point.clone()),x:event.clientX,y:event.clientY,pointerId:event.pointerId,moved:false,cursor:dragCanvas.style.cursor};
-   dragCanvas.style.cursor='grabbing';try{dragCanvas.setPointerCapture(event.pointerId);}catch{}focus(componentNames[component]);
+   dragCanvas.style.cursor='grabbing';try{dragCanvas.setPointerCapture(event.pointerId);}catch{}if(state.mode!=='assembly'&&registry[componentNames[component]])focus(componentNames[component]);
    window.parent.postMessage({type:'itlab-drag-start',component},'*');
   }
   function onDragMove(event){
@@ -400,17 +453,22 @@
   }
   function onDragUp(event){
    if(!drag||event.pointerId!==drag.pointerId)return;stopPointer(event);const old=drag,target=old.moved?nearestSlot(event.clientX,event.clientY):null;cancelDrag();
-   if(old.moved)window.parent.postMessage({type:'itlab-drop',component:old.component,target},'*');
+   if(!old.moved)return;
+   if(dragConfig.remove){if(target==='TRAY')window.parent.postMessage({type:'itlab-remove',component:old.component},'*');}
+   else window.parent.postMessage({type:'itlab-drop',component:old.component,target},'*');
   }
   function onDragCancel(event){if(drag&&event.pointerId===drag.pointerId){stopPointer(event);cancelDrag();}}
   function configureDrag(config={}){
-   const allowed=Array.isArray(config.parts)?config.parts.filter(k=>Object.hasOwn(componentNames,k)):['RAM','SSD','GPU'];
-   dragConfig={enabled:config.enabled===true,parts:allowed,showTargets:config.showTargets!==false};
+   const allowed=Array.isArray(config.parts)?config.parts.filter(k=>Object.hasOwn(componentNames,k)):legacyParts;
+   dragConfig={enabled:config.enabled===true,parts:allowed,showTargets:config.showTargets!==false,targetSlot:Object.hasOwn(slotAnchors,config.targetSlot)?config.targetSlot:null,wire:config.wire||null,remove:config.remove===true};
    if(!dragCanvas)dragCanvas=document.querySelector('#stage canvas');if(!dragCanvas)return{...dragConfig};
    if(!dragConfig.enabled)cancelDrag();
    if(dragConfig.enabled&&!dragListenersOn){for(const [name,fn]of[['pointerdown',onDragDown],['pointermove',onDragMove],['pointerup',onDragUp],['pointercancel',onDragCancel]])dragCanvas.addEventListener(name,fn,{capture:true});dragListenersOn=true;}
    if(!dragConfig.enabled&&dragListenersOn){for(const [name,fn]of[['pointerdown',onDragDown],['pointermove',onDragMove],['pointerup',onDragUp],['pointercancel',onDragCancel]])dragCanvas.removeEventListener(name,fn,{capture:true});dragListenersOn=false;}
-   dragSlotLayer.visible=dragConfig.enabled&&dragConfig.showTargets;updateSlotMarkers();if(dragConfig.enabled){trayNeedsLayout=true;layoutDetachedTrays(true);}return{...dragConfig};
+   dragSlotLayer.visible=dragConfig.enabled&&dragConfig.showTargets;
+   applyHardwarePoses();
+   if(dragConfig.enabled){trayNeedsLayout=true;layoutDetachedTrays(true);}
+   updateSlotMarkers();return{...dragConfig};
   }
   function setTutorial(index){
    tutorialIndex=Number.isInteger(index)&&index>=0&&index<10?index:-1;
@@ -427,7 +485,17 @@
   const microHitMeshes=microParts.filter(p=>p.id!=='pcb').flatMap(p=>[p.center,...(p.instances||[])].map(center=>{const mesh=new THREE.Mesh(new THREE.BoxGeometry(...p.size),microHitMaterial);mesh.position.set(...center);mesh.userData.microPick=p.id;board.add(mesh);return mesh;}));
   const microRay=new THREE.Raycaster(),microPointer=new THREE.Vector2();
   dragCanvas.addEventListener('pointerdown',e=>{microDown={x:e.clientX,y:e.clientY};});
-  dragCanvas.addEventListener('pointerup',e=>{if(!microDown)return;const d=Math.hypot(e.clientX-microDown.x,e.clientY-microDown.y);microDown=null;if(!microEnabled||d>5||!dragCamera)return;const rect=dragCanvas.getBoundingClientRect();microPointer.set((e.clientX-rect.left)/rect.width*2-1,1-(e.clientY-rect.top)/rect.height*2);microRay.setFromCamera(microPointer,dragCamera);scene.updateMatrixWorld(true);const hit=microRay.intersectObjects(microHitMeshes,false)[0];if(!hit)return;const actual=[];for(const g of Object.values(registry))g.traverse(n=>{if(n.isMesh&&!n.userData.microPick&&visibleMesh(n,g))actual.push(n);});const surface=microRay.intersectObjects(actual,false)[0];if(surface&&Math.abs(surface.distance-hit.distance)<.16)window.parent.postMessage({type:'itlab-micro-selection',id:hit.object.userData.microPick},'*');});
+  dragCanvas.addEventListener('pointerup',e=>{
+   if(!microDown)return;
+   const d=Math.hypot(e.clientX-microDown.x,e.clientY-microDown.y);microDown=null;
+   if(d>5||!dragCamera)return;
+   if(state.mode==='assembly'&&dragConfig.wire&&dragConfig.targetSlot&&dragConfig.showTargets){
+    if(nearestSlot(e.clientX,e.clientY)===dragConfig.targetSlot)window.parent.postMessage({type:'itlab-wire-click',key:dragConfig.wire},'*');
+    return;
+   }
+   if(!microEnabled)return;
+   const rect=dragCanvas.getBoundingClientRect();microPointer.set((e.clientX-rect.left)/rect.width*2-1,1-(e.clientY-rect.top)/rect.height*2);microRay.setFromCamera(microPointer,dragCamera);scene.updateMatrixWorld(true);const hit=microRay.intersectObjects(microHitMeshes,false)[0];if(!hit)return;const actual=[];for(const g of Object.values(registry))g.traverse(n=>{if(n.isMesh&&!n.userData.microPick&&visibleMesh(n,g))actual.push(n);});const surface=microRay.intersectObjects(actual,false)[0];if(surface&&Math.abs(surface.distance-hit.distance)<.16)window.parent.postMessage({type:'itlab-micro-selection',id:hit.object.userData.microPick},'*');
+  });
   window.ITLAB_MODEL={focus,setState,setTutorial,configureDrag,getDragTargets,microInspector,setMicroEnabled:value=>microEnabled=value===true,getMicroParts:()=>microParts.map(p=>({...p})),getState:()=>({...state}),names:Object.keys(registry),getTutorialState:()=>({index:tutorialIndex,activeRoutes:tutorialRoutes.filter(r=>r.route.visible).length,power:state.power,fanAngle:spins[0].rotation.z,marker:tutorialIndex>=0?tutorialRoutes[tutorialIndex].markers[0].position.toArray():null}),getMetrics:()=>({...lastMetrics})};
   // Reuse the viewer's OrbitControls for closer framing of this compact assembly.
   // Geometry, controls and free rotation stay in the standard interaction shell.
@@ -436,8 +504,16 @@
    const canvas=document.querySelector('#stage canvas');if(!canvas)return;
    for(let i=0;i<13;i++)canvas.dispatchEvent(new WheelEvent('wheel',{deltaY:opening?-100:100,bubbles:true,cancelable:true}));
   },0));
-  let last=0;function animate(t){requestAnimationFrame(animate);const dt=Math.min((t-last)/1000,.05);last=t;if(state.power)for(const f of spins)f.rotation.z+=dt*3;if(helper&&focusGroup)helper.update();
-   powerLampMaterial.color.setHex(state.power?0x8fffc2:0x314644);standbyLampMaterial.color.setHex(tutorialIndex>=0||state.power?0x8fffc2:0x273e3c);
+  let last=0;function animate(t){requestAnimationFrame(animate);const dt=Math.min((t-last)/1000,.05);last=t;
+   const full=state.mode==='assembly';
+   if(state.power)for(const f of spins){
+    const owner=fanAssemblies.get(f);
+    const connected=!full||(owner===cooling?state.wiring?.cpuFan:owner===caseFans?state.wiring?.sysFan:state.wiring?.gpu);
+    if(connected)f.rotation.z+=dt*3;
+   }
+   if(helper&&focusGroup)helper.update();
+   const standby=full?state.mains&&state.psuSwitch&&state.wiring?.atx:tutorialIndex>=0||state.power;
+   powerLampMaterial.color.setHex(state.power?0x8fffc2:0x314644);standbyLampMaterial.color.setHex(standby?0x8fffc2:0x273e3c);
    if(dragSlotLayer.visible)updateSlotMarkers();
    if(tutorialIndex>=0){const route=tutorialRoutes[tutorialIndex];route.markers.forEach((m,i)=>m.position.copy(route.curve.getPointAt((t*.00024+i/3)%1)));}
   }requestAnimationFrame(animate);

@@ -4,7 +4,7 @@ module.exports=function buildI18n(){
  const root=__dirname,read=file=>fs.readFileSync(path.join(root,file),'utf8');
  const kk=require('./locale-kk.js'),ui=require('./locale-ui-kk.js'),lessons=require('./component-lessons.js'),micro=require('./micro-data.js'),tutorial=require('./tutorial.js');
  const sandbox={window:{}};vm.runInNewContext(read('catalog-data.js'),sandbox);const catalog=sandbox.window.ITLAB_CATALOG;
- const strings={...ui.strings};
+ const strings={...ui.strings,...require('./locale-assembly-kk.js')};
  const add=(ru,kz)=>{if(typeof ru!=='string'||!kz)throw Error('Missing Kazakh translation: '+ru);strings[ru]=kz;};
  for(const [name,entry]of Object.entries(lessons.main)){
    const localized=kk.main[name];if(!localized)throw Error('Missing component: '+name);add(name,localized.name);
