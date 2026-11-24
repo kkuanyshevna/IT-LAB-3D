@@ -175,6 +175,28 @@
 .assembly-detail p { color: var(--knowledge-text); font-size: 12px; }
 .assembly-detail .assembly-drag-hint { color: var(--muted); font-size: 11px; }
 .assembly-detail .assembly-placement-issue { color: var(--accent); font-size: 11px; }
+.assembly-guide-toggle { justify-self: start; }
+.assembly-guide {
+  display: grid;
+  gap: 4px;
+  padding: 9px 11px;
+  border: 1px solid #9b784d;
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+  background: #2b2826;
+}
+.assembly-guide > span { color: var(--accent); font-size: 10px; }
+.assembly-guide > p { color: var(--text); font-size: 12px; }
+.assembly-check-result {
+  margin: 0;
+  padding: 8px 10px;
+  background: #6b473444;
+  border: 1px solid #ac7d4c;
+  border-radius: 6px;
+  font-size: 12px;
+}
+.assembly-check-result.good { border-color: #538174; background: #20483b77; }
+.assembly-workbench button[data-assembly-next] { outline: 2px solid var(--accent); outline-offset: -2px; }
 .assembly-removal-zone {
   position: absolute;
   top: calc(43% - 26px);

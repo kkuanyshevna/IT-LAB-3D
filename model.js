@@ -260,7 +260,11 @@
   const ssd=group();box(ssd,-.22,3.28,-.8,1.07,.28,.035,pcb);for(let i=0;i<2;i++)box(ssd,-.3+i*.31,3.28,-.76,.25,.21,.045,black);box(ssd,-.62,3.28,-.76,.17,.18,.035,steel);for(let i=0;i<10;i++)if(i!==6)box(ssd,-.81,3.17+i*.022,-.79,.09,.012,.04,gold);label(ssd,'NVMe',-.1,3.29,-.725,.51,.12);screw(ssd,.38,3.28,-.74);ring(ssd,.38,3.28,-.775,.048,.008,gold);
   const ssdPassives=[];for(let i=0;i<12;i++)ssdPassives.push({p:[-.7+(i%6)*.048,3.17+Math.floor(i/6)*.23,-.763]});batch(ssd,new THREE.BoxGeometry(.025,.018,.025),silver,ssdPassives);label(ssd,'CTRL',-.62,3.28,-.738,.15,.05);
   register('SSD M.2','SSD хранит операционную систему, программы и файлы без постоянного питания. В модели показан M.2 NVMe-накопитель. M.2 описывает форм-фактор и разъём; поддерживаемый протокол и ключ нужно сверять с платой.',ssd,[.55,-.4,1.85],[.3,3.43,-.71]);
-  const psu=group();box(psu,-.45,.71,-.04,1.99,1.0,2.26,black);for(let i=0;i<12;i++)box(psu,-1.455,.35+i*.063,-.05,.016,.025,1.9,steel);box(psu,-1.48,.8,-.75,.045,.35,.27,dark);box(psu,-1.51,.83,-.22,.035,.2,.13,white);label(psu,'PSU  /  650 W',-.48,.71,1.104,1.62,.22);for(const z of [-.8,.8])screw(psu,-1.48,.35,z,'x');
+  const psu=group();box(psu,-.45,.71,-.04,1.99,1.0,2.26,black);for(let i=0;i<12;i++)box(psu,-1.455,.35+i*.063,-.05,.016,.025,1.9,steel);
+  box(psu,-1.48,.8,-.75,.045,.35,.27,steel);
+  box(psu,-1.505,.8,-.75,.016,.27,.21,dark);
+  for(const [y,z] of [[.85,-.75],[.76,-.8],[.76,-.7]])box(psu,-1.522,y,z,.035,.041,.017,silver);
+  box(psu,-1.51,.83,-.22,.035,.2,.13,white);label(psu,'PSU  /  650 W',-.48,.71,1.104,1.62,.22);for(const z of [-.8,.8])screw(psu,-1.48,.35,z,'x');
   // Exterior fan grille stays closed: no internal PSU circuitry is modelled.
   cyl(psu,-.45,1.223,-.05,.75,.012,dark);for(const r of [.14,.25,.36,.47,.58,.69])ring(psu,-.45,1.24,-.05,r,.009,silver,'y');for(let i=0;i<4;i++){const a=i*Math.PI/2+.3,o=box(psu,-.45,1.25,-.05,1.43,.013,.018,steel);o.rotation.y=a;}
   for(const x of [-1.13,.23])for(const z of [-.73,.63])screw(psu,x,1.25,z,'y');
@@ -286,7 +290,8 @@
   tube(harness.frontPanel,[[1.09,5.61,.92],[1.45,4.2,-.32],[1.39,1.27,-.6],[.18,1.52,-.72]],.021,signalWire);
   box(harness.frontPanel,.18,1.52,-.69,.18,.068,.1,plastic);
   tube(harness.monitor,[[-1.59,2.8,.25],[-1.97,2.64,.28],[-2.25,1.14,.33],[-2.65,.22,.82],[-3.27,.17,1.27]],.026,blue);
-  tube(harness.mains,[[-1.54,.83,-.22],[-1.87,.75,-.27],[-1.99,.23,-.25],[-2.56,.16,-.03]],.033,plastic);
+  rounded(harness.mains,-1.59,.8,-.75,.17,.25,.19,black,.025);
+  tube(harness.mains,[[-1.66,.8,-.75],[-1.87,.75,-.68],[-1.99,.23,-.54],[-2.56,.16,-.3]],.033,plastic);
   for(const [x,y,z]of[[1.38,1.53,-.85],[1.38,3.55,-.86],[-1.3,2.4,-1.1]]){box(harness.atx,x,y,z,.075,.09,.34,steel);screw(harness.atx,x,y,z+.18);}
   register('Кабели питания','Разные кабели питают плату, CPU и видеокарту. Разъёмы ATX, EPS и PCIe имеют разное назначение: внешне похожие кабели нельзя считать взаимозаменяемыми. Виртуальная практика здесь не заменяет руководство конкретного оборудования.',power,[.8,0,-.4],[1.3,3.05,-.45]);
   // Router: tapered appearance via stacked surfaces, vents, port recesses and antennas.
@@ -318,13 +323,16 @@
   const componentGroups={...Object.fromEntries(Object.entries(componentNames).map(([key,name])=>[key,registry[name]])),FANS:caseFans};
   const grabAnchors={RAM:[.61,4.05,-.29],SSD:[-.22,3.28,-.725],GPU:[-.2,2.77,.58],BOARD:[-.4,4.02,-.78],CPU:[-.4,4.03,-.64],COOLER:[-.4,4.03,.42],PSU:[-.45,.71,1.12],FANS:[1.63,3.15,0]};
   const slotAnchors={DIMM:[.8,4.05,-.7],'M.2':[-.22,3.28,-.8],PCIe:[-.25,2.94,-.83],'ATX TRAY':[-.05,3.35,-1],LGA:[-.4,4.03,-.79],'CPU MOUNT':[-.4,4.03,-.56],'PSU BAY':[-.45,.71,.3],'FAN MOUNT':[1.63,3.15,0],'ATX 24-pin':[1.22,3.04,-.72],'EPS CPU 8-pin':[-1.18,5.16,-.77],'PCIe GPU 8-pin':[1.08,2.86,.18],CPU_FAN:[.92,5.12,-.75],SYS_FAN:[.63,1.5,-.78],F_PANEL:[.18,1.52,-.73],HDMI:[-1.59,2.8,.25]};
-  const slotOwners={'ATX TRAY':chassis,'PSU BAY':chassis,'FAN MOUNT':chassis,'PCIe GPU 8-pin':gpu,HDMI:gpu};
+  Object.assign(slotAnchors,{'PANEL EDGE':[-.62,3.5,1.4],'AC IN':[-1.53,.8,-.75],'PSU SWITCH':[-1.54,.83,-.22],'CASE POWER':[1.1,5.77,.9]});
+  const slotOwners={'ATX TRAY':chassis,'PSU BAY':chassis,'FAN MOUNT':chassis,'PCIe GPU 8-pin':gpu,HDMI:gpu,'PANEL EDGE':chassis,'AC IN':psu,'PSU SWITCH':psu,'CASE POWER':chassis};
   const trayScales={BOARD:.63,FANS:.58,PSU:.83,COOLER:.9};
   const componentCenters=Object.fromEntries(Object.entries(componentGroups).map(([key,g])=>[key,g.worldToLocal(new THREE.Box3().setFromObject(g).getCenter(new THREE.Vector3()))]));
   const detachedBases=Object.fromEntries(Object.keys(componentGroups).map(key=>[key,new THREE.Vector3(2.8,-1.2,1.6)]));
   const stageElement=document.getElementById('stage');
   const placementTag=document.createElement('button');
   placementTag.type='button';placementTag.className='assembly-placement-tag';placementTag.hidden=true;
+  const placementLabel=document.createElement('span'),placementPort=document.createElement('small');
+  placementPort.hidden=true;placementTag.append(placementLabel,placementPort);
   const carryTag=document.createElement('span');
   carryTag.className='assembly-carry-tag';carryTag.textContent='Перетащи';carryTag.hidden=true;
   stageElement.append(placementTag,carryTag);
@@ -333,12 +341,14 @@
   let drag=null,dragListenersOn=false,trayNeedsLayout=true;
   placementTag.addEventListener('click',()=>{
    if(placementTag.hidden||drag||state.mode!=='assembly')return;
-   if(dragConfig.wire)window.parent.postMessage({type:'itlab-wire-click',key:dragConfig.wire},'*');
+   if(dragConfig.control)window.parent.postMessage({type:'itlab-assembly-control',action:dragConfig.control.action},'*');
+   else if(dragConfig.wire)window.parent.postMessage({type:'itlab-wire-click',key:dragConfig.wire},'*');
    else window.parent.postMessage({type:'itlab-drop',component:dragConfig.parts[0],target:dragConfig.targetSlot},'*');
   });
   const dragRaycaster=new THREE.Raycaster(),dragPointer=new THREE.Vector2();
   const dragSlotLayer=group();objectRoot.add(dragSlotLayer);dragSlotLayer.visible=false;
   const slotSizes={DIMM:[.62,1.78,.14],'M.2':[1.17,.36,.12],PCIe:[2.03,.2,.15],'ATX TRAY':[2.92,3.96,.15],LGA:[.82,.86,.08],'CPU MOUNT':[1.15,1.05,.17],'PSU BAY':[2.02,1.03,1.95],'FAN MOUNT':[.23,3.6,1.13],'ATX 24-pin':[.3,.88,.15],'EPS CPU 8-pin':[.44,.19,.12],'PCIe GPU 8-pin':[.22,.23,.28],CPU_FAN:[.34,.15,.13],SYS_FAN:[.19,.14,.14],F_PANEL:[.48,.19,.14],HDMI:[.16,.22,.22]};
+  Object.assign(slotSizes,{'PANEL EDGE':[2.48,3.48,.14],'AC IN':[.13,.25,.29],'PSU SWITCH':[.12,.21,.12],'CASE POWER':[.22,.09,.22]});
   const slotMarkers=Object.fromEntries(Object.entries(slotAnchors).map(([key,anchor])=>{
    const shape=new THREE.BoxGeometry(...slotSizes[key]),edges=new THREE.EdgesGeometry(shape);shape.dispose();
    const marker=new THREE.LineSegments(edges,new THREE.LineBasicMaterial({color:0xe8b775,transparent:true,opacity:.87,depthTest:false}));marker.renderOrder=42;marker.raycast=()=>{};marker.position.set(...anchor);dragSlotLayer.add(marker);return[key,marker];
@@ -437,7 +447,7 @@
   function updatePlacementTags(){
    const full=state.mode==='assembly'&&dragConfig.enabled;
    const target=full&&dragConfig.showTargets&&dragConfig.targetSlot?projectPoint(slotWorldPoint(dragConfig.targetSlot)):null;
-   const key=full&&!drag&&!dragConfig.remove?dragConfig.parts[0]:null;
+   const key=full&&!drag&&!dragConfig.remove&&!dragConfig.control?dragConfig.parts[0]:null;
    const source=key?projectPoint(sourcePoint(key)):null;
    const hidePlacement=!target?.visible,hideCarry=!source?.visible;
    if(placementTag.hidden!==hidePlacement)placementTag.hidden=hidePlacement;
@@ -445,10 +455,15 @@
    const width=dragCanvas?.clientWidth||0,height=dragCanvas?.clientHeight||0;
    const clamp=(value,min,max)=>Math.min(max,Math.max(min,value));
    if(target?.visible){
-    const label=drag?.snapped?'Отпусти деталь':dragConfig.wire?(state.wiring[dragConfig.wire]?'Отсоединить':'Подключить'):'Установить сюда';
-    if(placementTag.dataset.label!==label){placementTag.textContent=label;placementTag.dataset.label=label;}
+    const label=dragConfig.control?.label||(drag?.snapped?'Отпусти деталь':dragConfig.wire?(state.wiring[dragConfig.wire]?'Отсоединить':'Подключить'):'Установить сюда');
+    if(placementTag.dataset.label!==label){placementLabel.textContent=label;placementTag.dataset.label=label;}
+    const port=dragConfig.wire?dragConfig.targetSlot:'';
+    if(placementPort.textContent!==port)placementPort.textContent=port;
+    placementPort.hidden=!port;
     placementTag.toggleAttribute('data-snapped',Boolean(drag?.snapped));
-    placeTagAt(placementTag,clamp(target.canvasX,67,width-67),clamp(target.canvasY-8,38,height-8));
+    placementTag.toggleAttribute('data-guided',dragConfig.guided===true);
+    const edge=Math.max(67,placementTag.offsetWidth/2+4);
+    placeTagAt(placementTag,clamp(target.canvasX,edge,width-edge),clamp(target.canvasY-8,placementTag.offsetHeight+4,height-8));
    }
    if(source?.visible)placeTagAt(carryTag,clamp(source.canvasX,42,width-42),clamp(source.canvasY+37,24,height-24));
   }
@@ -456,7 +471,7 @@
   function getDragTargets(){
    if(!dragCamera||!dragCanvas)return{ready:false,space:'iframe-client',sources:{},targets:{}};
    scene.updateMatrixWorld(true);const rect=dragCanvas.getBoundingClientRect(),sources={},targets={};
-   for(const key of state.mode==='assembly'?dragConfig.parts:legacyParts){const p=projectPoint(sourcePoint(key),rect);sources[key]={...p,installed:state[componentKeys[key]],draggable:dragConfig.enabled&&dragConfig.parts.includes(key)&&Boolean(state[componentKeys[key]])===dragConfig.remove};}
+   for(const key of state.mode==='assembly'?dragConfig.parts:legacyParts){const p=projectPoint(sourcePoint(key),rect);sources[key]={...p,installed:state[componentKeys[key]],draggable:dragConfig.enabled&&!dragConfig.control&&dragConfig.parts.includes(key)&&Boolean(state[componentKeys[key]])===dragConfig.remove};}
    for(const key of activeSlots())targets[key]=projectPoint(slotWorldPoint(key),rect);
    if(dragConfig.remove)targets.TRAY={x:rect.left+rect.width*.81,y:rect.top+rect.height*.43,visible:true};
    return{ready:true,space:'iframe-client',canvas:{left:rect.left,top:rect.top,width:rect.width,height:rect.height},sources,targets};
@@ -492,7 +507,7 @@
    resetSlotColors();
   }
   function onDragDown(event){
-   if(!dragConfig.enabled||!dragCamera||event.button!==0||drag)return;
+   if(!dragConfig.enabled||dragConfig.control||!dragCamera||event.button!==0||drag)return;
    scene.updateMatrixWorld(true);pointerRay(event);const meshes=[],owners=new Map();
    for(const key of dragConfig.parts){if(!componentNames[key]||Boolean(state[componentKeys[key]])!==dragConfig.remove)continue;const g=componentGroups[key];g.traverse(n=>{if(!n.userData.microPick&&visibleMesh(n,g)){meshes.push(n);owners.set(n,key);}});}
    const hit=dragRaycaster.intersectObjects(meshes,false)[0];
@@ -537,7 +552,7 @@
   function onDragCancel(event){if(drag&&event.pointerId===drag.pointerId){stopPointer(event);cancelDrag();}}
   function configureDrag(config={}){
    const allowed=Array.isArray(config.parts)?config.parts.filter(k=>Object.hasOwn(componentNames,k)):legacyParts;
-   dragConfig={enabled:config.enabled===true,parts:allowed,showTargets:config.showTargets!==false,targetSlot:Object.hasOwn(slotAnchors,config.targetSlot)?config.targetSlot:null,wire:config.wire||null,remove:config.remove===true,canSnap:config.canSnap===true};
+   dragConfig={enabled:config.enabled===true,parts:allowed,showTargets:config.showTargets!==false,targetSlot:Object.hasOwn(slotAnchors,config.targetSlot)?config.targetSlot:null,wire:config.wire||null,remove:config.remove===true,canSnap:config.canSnap===true,control:config.control||null,guided:config.guided===true};
    if(!dragCanvas)dragCanvas=document.querySelector('#stage canvas');if(!dragCanvas)return{...dragConfig};
    if(!dragConfig.enabled)cancelDrag();
    if(dragConfig.enabled&&!dragListenersOn){for(const [name,fn]of[['pointerdown',onDragDown],['pointermove',onDragMove],['pointerup',onDragUp],['pointercancel',onDragCancel]])dragCanvas.addEventListener(name,fn,{capture:true});dragListenersOn=true;}

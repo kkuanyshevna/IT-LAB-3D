@@ -19,16 +19,43 @@ function wire(s,omit=[]){
 function turnOn(s){apply(s,'connectMains');apply(s,'switchPsu');apply(s,'powerOn');}
 function unplug(s){if(s.power)apply(s,'powerOff');apply(s,'switchPsu');apply(s,'disconnectMains');}
 
-test('empty case can reach POST and finish only after rechecking the current build',()=>{
+test('finish verifies a booted PC in the current revision, including with the panel open',()=>{
   const s=lab.create('build');
   assert.ok(Object.keys(lab.parts).every(id=>!lab.has(s,id)));
-  mount(s);wire(s);apply(s,'closePanel');turnOn(s);
+  mount(s);wire(s);turnOn(s);
   assert.equal(lab.display(s),'ready');
-  assert.equal(lab.act(s,'finish').ok,false);
   assert.equal(apply(s,'checkDisplay').passed,true);
   apply(s,'detachCable','monitor');apply(s,'attachCable','monitor');
-  assert.equal(lab.act(s,'finish').ok,false);
-  apply(s,'checkDisplay');apply(s,'finish');assert.equal(s.complete,true);
+  assert.notEqual(s.testedAt,s.revision);
+  apply(s,'finish');
+  assert.equal(s.complete,true);assert.equal(s.testedAt,s.revision);
+  assert.equal(s.evidence.at(-1).passed,true);assert.equal(s.log.at(-2).action,'checkDisplay');
+});
+
+test('guide follows actual hardware state through all prerequisites and into completion',()=>{
+  const s=lab.create('build'), steps=[];
+  for(let attempts=0;!s.complete&&attempts<30;attempts++){
+    const step=lab.nextBuildStep(s);
+    steps.push(step.action+(step.wire?':'+step.wire:''));
+    apply(s,step.action,step.target);
+  }
+  assert.ok(s.complete);
+  assert.deepEqual(steps.slice(0,7),['openPanel','installBOARD','toggleSocket','installCPU','toggleSocket','applyPaste','installCOOLER']);
+  assert.deepEqual(steps.filter(action=>action.startsWith('attachCable:')),Object.keys(lab.cables).map(id=>'attachCable:'+id));
+  assert.deepEqual(steps.slice(-5),['closePanel','connectMains','switchPsu','powerOn','finish']);
+  assert.equal(lab.nextBuildStep(s),null);
+});
+
+test('an early finish reports the exact missing part, cable or power step',()=>{
+  const s=lab.create('build');
+  assert.match(lab.act(s,'finish').text,/Материнская плата/);
+  mount(s);wire(s,['eps','cpuFan']);
+  assert.match(lab.act(s,'finish').text,/EPS CPU 8-pin, CPU_FAN/);
+  apply(s,'attachCable','eps');apply(s,'attachCable','cpuFan');
+  assert.match(lab.act(s,'finish').text,/Сетевой шнур не подключён/);
+  apply(s,'connectMains');assert.match(lab.act(s,'finish').text,/Блок питания выключен/);
+  apply(s,'switchPsu');assert.match(lab.act(s,'finish').text,/Нажми Power/);
+  assert.equal(s.complete,false);
 });
 
 test('socket, paste, correct mount, cable and live-power interlocks protect the assembly',()=>{
