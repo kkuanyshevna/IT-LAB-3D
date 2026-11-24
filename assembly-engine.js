@@ -58,6 +58,21 @@
 
   function has(s,id) {return Boolean(parts[id]&&s[parts[id].key]);}
   function live(s) {return s.mains&&s.psuSwitch&&has(s,'PSU');}
+  function accessIssue(s){
+    if(s.power||s.mains)return 'Выключи ПК и отсоедини сетевой шнур перед работой внутри корпуса.';
+    if(!s.panelOpen)return 'Сначала сними боковую панель.';
+    return '';
+  }
+  function installationIssue(s,id,target){
+    const blocked=accessIssue(s);
+    if(blocked)return blocked;
+    if(has(s,id))return 'Этот компонент уже установлен.';
+    if(target!==parts[id].slot)return 'Неверное место установки. Выбери подходящее крепление.';
+    if(!['BOARD','PSU','FANS'].includes(id)&&!has(s,'BOARD'))return 'Сначала установи материнскую плату.';
+    if(id==='CPU'&&!s.socketOpen)return 'Открой фиксатор сокета перед установкой CPU.';
+    if(id==='COOLER'&&(!has(s,'CPU')||s.socketOpen||s.paste!=='fresh'))return 'Установи CPU, закрой фиксатор и нанеси свежую термопасту.';
+    return '';
+  }
   function display(s) {
     if(!s.power){
       if(typeof s.startAttempt==='string')return s.startAttempt;
@@ -107,8 +122,8 @@
       return result(text);
     }
     function inside() {
-      if(s.power||s.mains)return result('Выключи ПК и отсоедини сетевой шнур перед работой внутри корпуса.',false);
-      if(!s.panelOpen)return result('Сначала сними боковую панель.',false);
+      const reason=accessIssue(s);
+      if(reason)return result(reason,false);
     }
     if(action==='requestHint'){s.hintCount++;return result(recommended(s));}
     if(action==='inspectCable'){
@@ -181,16 +196,14 @@
     }
     const match=/^(install|remove)(BOARD|CPU|COOLER|RAM|SSD|GPU|PSU|FANS)$/.exec(action);
     if(match){
-      const blocked=inside();if(blocked)return blocked;
       const [,verb,id]=match,part=parts[id],installing=verb==='install';
-      if(has(s,id)===installing)return result(installing?'Этот компонент уже установлен.':'Этот компонент уже снят.',false);
       if(installing){
-        if(target!==part.slot)return result('Неверное место установки. Выбери подходящее крепление.',false);
-        if(!['BOARD','PSU','FANS'].includes(id)&&!has(s,'BOARD'))return result('Сначала установи материнскую плату.',false);
-        if(id==='CPU'&&!s.socketOpen)return result('Открой фиксатор сокета перед установкой CPU.',false);
-        if(id==='COOLER'&&(!has(s,'CPU')||s.socketOpen||s.paste!=='fresh'))return result('Установи CPU, закрой фиксатор и нанеси свежую термопасту.',false);
+        const reason=installationIssue(s,id,target);
+        if(reason)return result(reason,false);
         if(id==='COOLER')s.paste='used';
       }else{
+        const blocked=inside();if(blocked)return blocked;
+        if(!has(s,id))return result('Этот компонент уже снят.',false);
         if(Object.entries(cables).some(([key,cable])=>s.wiring[key]&&cable.needs.includes(id)))return result('Сначала отсоедини кабели, подключённые к этому узлу.',false);
         if(id==='BOARD'&&['CPU','COOLER','RAM','SSD','GPU'].some(item=>has(s,item)))return result('Сначала сними компоненты, установленные на плате.',false);
         if(id==='CPU'&&(has(s,'COOLER')||!s.socketOpen||s.paste!=='none'))return result('Сними кулер, очисти термопасту и открой фиксатор сокета.',false);
@@ -219,5 +232,5 @@
     return result('Это действие не предусмотрено в полной сборке.',false);
   }
 
-  return {parts,cables,tasks,post,create,has,live,display,act,recommended};
+  return {parts,cables,tasks,post,create,has,live,display,act,recommended,installationIssue};
 });

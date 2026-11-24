@@ -322,7 +322,20 @@
   const trayScales={BOARD:.63,FANS:.58,PSU:.83,COOLER:.9};
   const componentCenters=Object.fromEntries(Object.entries(componentGroups).map(([key,g])=>[key,g.worldToLocal(new THREE.Box3().setFromObject(g).getCenter(new THREE.Vector3()))]));
   const detachedBases=Object.fromEntries(Object.keys(componentGroups).map(key=>[key,new THREE.Vector3(2.8,-1.2,1.6)]));
-  let dragCamera=null,dragCanvas=document.querySelector('#stage canvas'),dragConfig={enabled:false,parts:legacyParts,showTargets:true,targetSlot:null,wire:null,remove:false},drag=null,dragListenersOn=false,trayNeedsLayout=true;
+  const stageElement=document.getElementById('stage');
+  const placementTag=document.createElement('button');
+  placementTag.type='button';placementTag.className='assembly-placement-tag';placementTag.hidden=true;
+  const carryTag=document.createElement('span');
+  carryTag.className='assembly-carry-tag';carryTag.textContent='Перетащи';carryTag.hidden=true;
+  stageElement.append(placementTag,carryTag);
+  let dragCamera=null,dragCanvas=stageElement.querySelector('canvas');
+  let dragConfig={enabled:false,parts:legacyParts,showTargets:true,targetSlot:null,wire:null,remove:false,canSnap:false};
+  let drag=null,dragListenersOn=false,trayNeedsLayout=true;
+  placementTag.addEventListener('click',()=>{
+   if(placementTag.hidden||drag||state.mode!=='assembly')return;
+   if(dragConfig.wire)window.parent.postMessage({type:'itlab-wire-click',key:dragConfig.wire},'*');
+   else window.parent.postMessage({type:'itlab-drop',component:dragConfig.parts[0],target:dragConfig.targetSlot},'*');
+  });
   const dragRaycaster=new THREE.Raycaster(),dragPointer=new THREE.Vector2();
   const dragSlotLayer=group();objectRoot.add(dragSlotLayer);dragSlotLayer.visible=false;
   const slotSizes={DIMM:[.62,1.78,.14],'M.2':[1.17,.36,.12],PCIe:[2.03,.2,.15],'ATX TRAY':[2.92,3.96,.15],LGA:[.82,.86,.08],'CPU MOUNT':[1.15,1.05,.17],'PSU BAY':[2.02,1.03,1.95],'FAN MOUNT':[.23,3.6,1.13],'ATX 24-pin':[.3,.88,.15],'EPS CPU 8-pin':[.44,.19,.12],'PCIe GPU 8-pin':[.22,.23,.28],CPU_FAN:[.34,.15,.13],SYS_FAN:[.19,.14,.14],F_PANEL:[.48,.19,.14],HDMI:[.16,.22,.22]};
@@ -368,6 +381,7 @@
     lastTrayCamera.copy(camera.position);trayNeedsLayout=true;
    }
    if(trayNeedsLayout)layoutDetachedTrays();
+   updatePlacementTags();
   };
   let helper=null,focusGroup=null;
   function focus(name){if(helper){scene.remove(helper);helper.geometry.dispose();helper.material.dispose();helper=null;}const g=registry[name];if(!g)return false;focusGroup=g;helper=new THREE.BoxHelper(g,0xf4bf73);helper.material.depthTest=false;helper.renderOrder=20;scene.add(helper);document.getElementById('partName').textContent=name;document.getElementById('partInfo').textContent=g.userData.model.info;return true;}
@@ -407,25 +421,66 @@
    connected.visible=state.cableConnected;disconnected.visible=!state.cableConnected;plug.position.set(...(state.cableConnected?[-1.8,3.96,-.83]:[-2.35,.17,1.1]));return {...state};
   }
   function visibleMesh(node,root){if(!node.isMesh)return false;for(let p=node;p;p=p.parent){if(!p.visible)return false;if(p===root)return true;}return false;}
-  function projectPoint(point){
-   if(!dragCamera||!dragCanvas)return null;const rect=dragCanvas.getBoundingClientRect(),p=point.clone().project(dragCamera);
+  function projectPoint(point,rect=dragCanvas?.getBoundingClientRect()){
+   if(!dragCamera||!rect)return null;const p=point.clone().project(dragCamera);
    const canvasX=(p.x+1)*rect.width/2,canvasY=(1-p.y)*rect.height/2;
    return{x:rect.left+canvasX,y:rect.top+canvasY,canvasX,canvasY,visible:p.z>=-1&&p.z<=1&&canvasX>=0&&canvasX<=rect.width&&canvasY>=0&&canvasY<=rect.height};
   }
   function activeSlots(){return state.mode==='assembly'?[dragConfig.targetSlot].filter(Boolean):legacySlots;}
   function slotWorldPoint(key){return (slotOwners[key]||board).localToWorld(new THREE.Vector3(...slotAnchors[key]));}
+  function sourcePoint(key){return componentGroups[key].localToWorld(new THREE.Vector3(...grabAnchors[key]));}
+  function placeTagAt(element,x,y){
+   const left=Math.round(x)+'px',top=Math.round(y)+'px';
+   if(element.style.left!==left)element.style.left=left;
+   if(element.style.top!==top)element.style.top=top;
+  }
+  function updatePlacementTags(){
+   const full=state.mode==='assembly'&&dragConfig.enabled;
+   const target=full&&dragConfig.showTargets&&dragConfig.targetSlot?projectPoint(slotWorldPoint(dragConfig.targetSlot)):null;
+   const key=full&&!drag&&!dragConfig.remove?dragConfig.parts[0]:null;
+   const source=key?projectPoint(sourcePoint(key)):null;
+   const hidePlacement=!target?.visible,hideCarry=!source?.visible;
+   if(placementTag.hidden!==hidePlacement)placementTag.hidden=hidePlacement;
+   if(carryTag.hidden!==hideCarry)carryTag.hidden=hideCarry;
+   const width=dragCanvas?.clientWidth||0,height=dragCanvas?.clientHeight||0;
+   const clamp=(value,min,max)=>Math.min(max,Math.max(min,value));
+   if(target?.visible){
+    const label=drag?.snapped?'Отпусти деталь':dragConfig.wire?(state.wiring[dragConfig.wire]?'Отсоединить':'Подключить'):'Установить сюда';
+    if(placementTag.dataset.label!==label){placementTag.textContent=label;placementTag.dataset.label=label;}
+    placementTag.toggleAttribute('data-snapped',Boolean(drag?.snapped));
+    placeTagAt(placementTag,clamp(target.canvasX,67,width-67),clamp(target.canvasY-8,38,height-8));
+   }
+   if(source?.visible)placeTagAt(carryTag,clamp(source.canvasX,42,width-42),clamp(source.canvasY+37,24,height-24));
+  }
   function updateSlotMarkers(){const slots=activeSlots();scene.updateMatrixWorld(true);for(const [key,marker]of Object.entries(slotMarkers)){marker.visible=slots.includes(key);if(marker.visible)marker.position.copy(objectRoot.worldToLocal(slotWorldPoint(key)));}}
   function getDragTargets(){
    if(!dragCamera||!dragCanvas)return{ready:false,space:'iframe-client',sources:{},targets:{}};
    scene.updateMatrixWorld(true);const rect=dragCanvas.getBoundingClientRect(),sources={},targets={};
-   for(const key of state.mode==='assembly'?dragConfig.parts:legacyParts){const p=projectPoint(componentGroups[key].localToWorld(new THREE.Vector3(...grabAnchors[key])));sources[key]={...p,installed:state[componentKeys[key]],draggable:dragConfig.enabled&&dragConfig.parts.includes(key)&&Boolean(state[componentKeys[key]])===dragConfig.remove};}
-   for(const key of activeSlots())targets[key]=projectPoint(slotWorldPoint(key));
+   for(const key of state.mode==='assembly'?dragConfig.parts:legacyParts){const p=projectPoint(sourcePoint(key),rect);sources[key]={...p,installed:state[componentKeys[key]],draggable:dragConfig.enabled&&dragConfig.parts.includes(key)&&Boolean(state[componentKeys[key]])===dragConfig.remove};}
+   for(const key of activeSlots())targets[key]=projectPoint(slotWorldPoint(key),rect);
    if(dragConfig.remove)targets.TRAY={x:rect.left+rect.width*.81,y:rect.top+rect.height*.43,visible:true};
    return{ready:true,space:'iframe-client',canvas:{left:rect.left,top:rect.top,width:rect.width,height:rect.height},sources,targets};
   }
   function nearestSlot(x,y){
    const data=getDragTargets();if(!data.ready)return null;const radius=Math.max(24,Math.min(48,data.canvas.width*.04));
    if(dragConfig.remove){const p=data.targets.TRAY;return Math.abs(x-p.x)<data.canvas.width*.12&&Math.abs(y-p.y)<data.canvas.height*.15?'TRAY':null;}
+   if(state.mode==='assembly'){
+    const key=dragConfig.targetSlot,center=data.targets[key];
+    if(!dragConfig.showTargets||!center?.visible)return null;
+    if(dragConfig.wire)return Math.hypot(x-center.x,y-center.y)<=40?key:null;
+    const owner=slotOwners[key]||board;
+    const anchor=slotAnchors[key],size=slotSizes[key];
+    let halfWidth=0,halfHeight=0;
+    for(const dx of [-.5,.5])for(const dy of [-.5,.5])for(const dz of [-.5,.5]){
+     const corner=owner.localToWorld(new THREE.Vector3(anchor[0]+dx*size[0],anchor[1]+dy*size[1],anchor[2]+dz*size[2]));
+     const p=projectPoint(corner,data.canvas);
+     halfWidth=Math.max(halfWidth,Math.abs(p.x-center.x));
+     halfHeight=Math.max(halfHeight,Math.abs(p.y-center.y));
+    }
+    const minimum=Math.min(63,Math.max(43,data.canvas.width*.075));
+    const inset=(extent,span)=>Math.min(Math.max(minimum,extent+24),Math.max(minimum,span*.23));
+    return Math.abs(x-center.x)<=inset(halfWidth,data.canvas.width)&&Math.abs(y-center.y)<=inset(halfHeight,data.canvas.height)?key:null;
+   }
    const candidates=Object.entries(data.targets).map(([key,p])=>({key,p,d:Math.hypot(x-p.x,y-p.y)})).filter(c=>c.p.visible&&c.d<radius).sort((a,b)=>a.d-b.d);
    return candidates[0]?.key||null;
   }
@@ -433,23 +488,45 @@
   function stopPointer(event){event.preventDefault();event.stopImmediatePropagation();}
   function resetSlotColors(){for(const marker of Object.values(slotMarkers))marker.material.color.setHex(0xe8b775);}
   function cancelDrag(){
-   if(!drag)return;const old=drag;drag=null;setGroupBase(old.group,old.base);if(dragCanvas){dragCanvas.style.cursor=old.cursor;try{if(dragCanvas.hasPointerCapture(old.pointerId))dragCanvas.releasePointerCapture(old.pointerId);}catch{}}
+   if(!drag)return;const old=drag;drag=null;old.group.scale.copy(old.scale);setGroupBase(old.group,old.base);if(dragCanvas){dragCanvas.style.cursor=old.cursor;try{if(dragCanvas.hasPointerCapture(old.pointerId))dragCanvas.releasePointerCapture(old.pointerId);}catch{}}
    resetSlotColors();
   }
   function onDragDown(event){
    if(!dragConfig.enabled||!dragCamera||event.button!==0||drag)return;
    scene.updateMatrixWorld(true);pointerRay(event);const meshes=[],owners=new Map();
    for(const key of dragConfig.parts){if(!componentNames[key]||Boolean(state[componentKeys[key]])!==dragConfig.remove)continue;const g=componentGroups[key];g.traverse(n=>{if(!n.userData.microPick&&visibleMesh(n,g)){meshes.push(n);owners.set(n,key);}});}
-   const hit=dragRaycaster.intersectObjects(meshes,false)[0];if(!hit)return;const component=owners.get(hit.object),g=componentGroups[component];
-   stopPointer(event);const plane=new THREE.Plane().setFromNormalAndCoplanarPoint(dragCamera.getWorldDirection(new THREE.Vector3()),hit.point);
-   drag={component,group:g,base:g.userData.model.base.clone(),plane,startLocal:objectRoot.worldToLocal(hit.point.clone()),x:event.clientX,y:event.clientY,pointerId:event.pointerId,moved:false,cursor:dragCanvas.style.cursor};
+   const hit=dragRaycaster.intersectObjects(meshes,false)[0];
+   let component=hit&&owners.get(hit.object),point=hit?.point;
+   const trayPart=state.mode==='assembly'&&!dragConfig.remove?dragConfig.parts[0]:null;
+   if(!hit&&trayPart&&!state[componentKeys[trayPart]]){
+    const anchor=sourcePoint(trayPart),p=projectPoint(anchor);
+    if(p.visible&&Math.abs(event.clientX-p.x)<=37&&event.clientY>=p.y-30&&event.clientY<=p.y+52){component=trayPart;point=anchor;}
+   }
+   if(!component)return;
+   const g=componentGroups[component];
+   const plane=new THREE.Plane().setFromNormalAndCoplanarPoint(dragCamera.getWorldDirection(new THREE.Vector3()),point);
+   const start=dragRaycaster.ray.intersectPlane(plane,new THREE.Vector3());
+   if(!start)return;
+   stopPointer(event);
+   drag={component,group:g,base:g.userData.model.base.clone(),scale:g.scale.clone(),plane,startLocal:objectRoot.worldToLocal(start),x:event.clientX,y:event.clientY,pointerId:event.pointerId,moved:false,snapped:false,cursor:dragCanvas.style.cursor};
    dragCanvas.style.cursor='grabbing';try{dragCanvas.setPointerCapture(event.pointerId);}catch{}if(state.mode!=='assembly'&&registry[componentNames[component]])focus(componentNames[component]);
    window.parent.postMessage({type:'itlab-drag-start',component},'*');
   }
   function onDragMove(event){
    if(!drag||event.pointerId!==drag.pointerId)return;stopPointer(event);if(Math.hypot(event.clientX-drag.x,event.clientY-drag.y)>5)drag.moved=true;
-   if(!drag.moved)return;pointerRay(event);const point=new THREE.Vector3();if(dragRaycaster.ray.intersectPlane(drag.plane,point)){const delta=objectRoot.worldToLocal(point).sub(drag.startLocal);setGroupBase(drag.group,drag.base.clone().add(delta));}
-   const nearest=nearestSlot(event.clientX,event.clientY);for(const [key,marker]of Object.entries(slotMarkers))marker.material.color.setHex(key===nearest?0x9de6ee:0xe8b775);
+   if(!drag.moved)return;
+   const nearest=nearestSlot(event.clientX,event.clientY);
+   drag.snapped=Boolean(state.mode==='assembly'&&dragConfig.canSnap&&nearest);
+   if(drag.snapped){
+    drag.group.scale.setScalar(1);
+    setGroupBase(drag.group,originalBases[componentNames[drag.component]]||new THREE.Vector3());
+   }else{
+    drag.group.scale.copy(drag.scale);
+    pointerRay(event);
+    const point=dragRaycaster.ray.intersectPlane(drag.plane,new THREE.Vector3());
+    if(point){const delta=objectRoot.worldToLocal(point).sub(drag.startLocal);setGroupBase(drag.group,drag.base.clone().add(delta));}
+   }
+   for(const [key,marker]of Object.entries(slotMarkers))marker.material.color.setHex(key===nearest?0x9de6ee:0xe8b775);
   }
   function onDragUp(event){
    if(!drag||event.pointerId!==drag.pointerId)return;stopPointer(event);const old=drag,target=old.moved?nearestSlot(event.clientX,event.clientY):null;cancelDrag();
@@ -460,7 +537,7 @@
   function onDragCancel(event){if(drag&&event.pointerId===drag.pointerId){stopPointer(event);cancelDrag();}}
   function configureDrag(config={}){
    const allowed=Array.isArray(config.parts)?config.parts.filter(k=>Object.hasOwn(componentNames,k)):legacyParts;
-   dragConfig={enabled:config.enabled===true,parts:allowed,showTargets:config.showTargets!==false,targetSlot:Object.hasOwn(slotAnchors,config.targetSlot)?config.targetSlot:null,wire:config.wire||null,remove:config.remove===true};
+   dragConfig={enabled:config.enabled===true,parts:allowed,showTargets:config.showTargets!==false,targetSlot:Object.hasOwn(slotAnchors,config.targetSlot)?config.targetSlot:null,wire:config.wire||null,remove:config.remove===true,canSnap:config.canSnap===true};
    if(!dragCanvas)dragCanvas=document.querySelector('#stage canvas');if(!dragCanvas)return{...dragConfig};
    if(!dragConfig.enabled)cancelDrag();
    if(dragConfig.enabled&&!dragListenersOn){for(const [name,fn]of[['pointerdown',onDragDown],['pointermove',onDragMove],['pointerup',onDragUp],['pointercancel',onDragCancel]])dragCanvas.addEventListener(name,fn,{capture:true});dragListenersOn=true;}

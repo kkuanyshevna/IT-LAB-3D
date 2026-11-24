@@ -24,8 +24,9 @@
    const remove=hardware&&state.panelOpen&&assembly.has(state,assemblyView.part);
    const target=hardware?(!remove&&(basePart||state.boardInstalled)?part.slot:null):wire.needs.every(id=>assembly.has(state,id))?wire.name:null;
    const showTargets=state.panelOpen||!hardware&&assemblyView.wire==='monitor';
+   const canSnap=hardware&&!remove&&target!==null&&!assembly.installationIssue(state,assemblyView.part,target);
    $('assemblyRemovalZone').hidden=!remove;
-   m?.configureDrag({enabled:state.panelOpen||!hardware,parts:hardware?[assemblyView.part]:[],targetSlot:target,showTargets,wire:hardware?null:assemblyView.wire,remove});
+   m?.configureDrag({enabled:state.panelOpen||!hardware,parts:hardware?[assemblyView.part]:[],targetSlot:target,showTargets,wire:hardware?null:assemblyView.wire,remove,canSnap});
   }else m?.configureDrag?.({enabled:['repair','fault','experiment','exam'].includes(mode)&&!state.complete,parts:['RAM','SSD','GPU'],showTargets:mode!=='exam'});
   const locked=mode==='exam'&&!state.complete;
   m?.setMicroEnabled?.(!locked&&!full);

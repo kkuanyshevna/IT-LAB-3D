@@ -174,6 +174,7 @@
 .assembly-detail { display: grid; gap: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 6px; }
 .assembly-detail p { color: var(--knowledge-text); font-size: 12px; }
 .assembly-detail .assembly-drag-hint { color: var(--muted); font-size: 11px; }
+.assembly-detail .assembly-placement-issue { color: var(--accent); font-size: 11px; }
 .assembly-removal-zone {
   position: absolute;
   top: calc(43% - 26px);
