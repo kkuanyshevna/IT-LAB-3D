@@ -151,7 +151,9 @@ export async function handleMentor(request, env = {}, { fetchImpl = globalThis.f
   if (!key) return json({ code: 'mentor_not_configured', message: 'Живой ИИ-наставник ещё не подключён. Доступны встроенные учебные подсказки.' }, 503);
   const history = (Array.isArray(payload.history) ? payload.history : []).slice(-8).filter(x => isObject(x) && ['user', 'assistant'].includes(x.role) && typeof x.content === 'string').map(x => ({ role: x.role, content: cleanText(x.content, 600) }));
   const context = sanitizeContext(payload.context), selectedPart = PARTS.has(payload.selectedPart) ? payload.selectedPart : '';
-  const input = [{ role: 'developer', content: DEVELOPER }, ...history, { role: 'user', content: JSON.stringify({ question: cleanText(payload.question, 1200), selectedPart, context }) }];
+  const language=payload.language==='kk'?'kk':'ru';
+  const instruction=language==='kk'?DEVELOPER.replace('Отвечай по-русски','Отвечай на казахском языке'):DEVELOPER;
+  const input = [{ role: 'developer', content: instruction }, ...history, { role: 'user', content: JSON.stringify({ question: cleanText(payload.question, 1200), selectedPart, context }) }];
   const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 20000);
   try {
     const response = await fetchImpl(ENDPOINT, { method: 'POST', headers: { Authorization: 'Bearer ' + key, 'Content-Type': 'application/json' }, signal: controller.signal, body: JSON.stringify({ model, input, store: false, max_output_tokens: 900, reasoning: { effort: 'none' } }) });

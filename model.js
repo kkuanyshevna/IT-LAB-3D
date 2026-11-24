@@ -376,7 +376,7 @@
   }requestAnimationFrame(animate);
   // Selection text is owned by the standard viewer. Publish only the selected part name.
   for(const id of ['works','reset'])document.getElementById(id).addEventListener('click',()=>focus(null));
-  const observer=new MutationObserver(()=>{const name=document.getElementById('partName').textContent;if(registry[name]){if(focusGroup&&focusGroup!==registry[name])focus(null);window.parent.postMessage({type:'itlab-selection',name},'*');}});observer.observe(document.getElementById('partName'),{childList:true,subtree:true});
+  const observer=new MutationObserver(()=>{const name=window.ITLAB_I18N?.canonical(document.getElementById('partName').textContent)||document.getElementById('partName').textContent;if(registry[name]){if(focusGroup&&focusGroup!==registry[name])focus(null);window.parent.postMessage({type:'itlab-selection',name},'*');}});observer.observe(document.getElementById('partName'),{childList:true,subtree:true});
   setTimeout(()=>window.parent.postMessage({type:'itlab-ready',parts:Object.keys(registry)},'*'),0);
  },
  stages:[
