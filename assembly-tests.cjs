@@ -2,8 +2,8 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const lab=require('./assembly-engine.js');
 
-const apply=(s,action,target)=>{
-  const result=lab.act(s,action,target);
+const apply=(s,action,target,connector)=>{
+  const result=lab.act(s,action,target,connector);
   assert.equal(result.ok,true,`${action}: ${result.text}`);
   return result;
 };
@@ -14,7 +14,7 @@ function mount(s){
   for(const id of ['RAM','SSD','GPU','PSU','FANS'])put(s,id);
 }
 function wire(s,omit=[]){
-  for(const key of Object.keys(lab.cables))if(!omit.includes(key))apply(s,'attachCable',key);
+  for(const key of Object.keys(lab.cables))if(!omit.includes(key))apply(s,'attachCable',key,lab.cables[key].name);
 }
 function turnOn(s){apply(s,'connectMains');apply(s,'switchPsu');apply(s,'powerOn');}
 function unplug(s){if(s.power)apply(s,'powerOff');apply(s,'switchPsu');apply(s,'disconnectMains');}
@@ -56,6 +56,41 @@ test('an early finish reports the exact missing part, cable or power step',()=>{
   apply(s,'connectMains');assert.match(lab.act(s,'finish').text,/Блок питания выключен/);
   apply(s,'switchPsu');assert.match(lab.act(s,'finish').text,/Нажми Power/);
   assert.equal(s.complete,false);
+});
+
+test('unaided assembly validates manual destinations and suppresses hints and repair instructions',()=>{
+  const s=lab.create('solo');
+  assert.equal(lab.nextBuildStep(s),null);
+  assert.deepEqual(lab.availableMounts(s),['ATX TRAY','PSU BAY','FAN MOUNT']);
+  assert.equal(lab.act(s,'requestHint').ok,false);
+  assert.equal(s.hintCount,0);
+  assert.equal(s.log.length,0);
+  assert.equal(lab.act(s,'finish').text,'Сборка ещё не прошла проверку.');
+  mount(s);
+  assert.equal(lab.act(s,'attachCable','eps','ATX 24-pin').text,'Действие не выполнено.');
+  assert.equal(s.wiring.eps,false);
+  wire(s);turnOn(s);
+  assert.equal(apply(s,'finish').passed,true);
+});
+
+test('monitor power, HDMI and the selected input control the visible result without powering off the PC',()=>{
+  const s=lab.create('build');
+  mount(s);wire(s,['monitor']);turnOn(s);
+  assert.equal(lab.monitorDisplay(s).kind,'standby');
+  apply(s,'attachCable','monitor');
+  apply(s,'monitorPower');
+  assert.equal(lab.display(s),'ready');
+  assert.equal(lab.monitorDisplay(s).kind,'off');
+  assert.equal(apply(s,'checkDisplay').passed,false);
+  assert.match(lab.act(s,'finish').text,/Включи монитор/);
+  assert.equal(lab.nextBuildStep(s).action,'monitorPower');
+  apply(s,'monitorPower');apply(s,'monitorInput');
+  assert.equal(lab.monitorDisplay(s).title,'Нет сигнала');
+  assert.equal(lab.nextBuildStep(s).action,'monitorInput');
+  assert.match(lab.act(s,'finish').text,/DisplayPort/);
+  apply(s,'monitorInput');
+  assert.equal(lab.monitorDisplay(s).kind,'desktop');
+  assert.equal(apply(s,'finish').passed,true);
 });
 
 test('socket, paste, correct mount, cable and live-power interlocks protect the assembly',()=>{

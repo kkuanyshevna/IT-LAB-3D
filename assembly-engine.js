@@ -25,6 +25,7 @@
   };
   const tasks = {
     build: {title:'Собрать ПК с нуля', goal:'Установи все детали, подключи кабели и проверь запуск учебной системы.'},
+    solo: {title:'Собрать ПК без подсказок', goal:'Собери компьютер, подключи монитор и добейся загрузки системы.'},
     strip: {title:'Разобрать ПК', goal:'Обесточь компьютер, отсоедини кабели и освободи корпус от всех деталей.'},
     diagnose: {title:'Диагностика: нет изображения', goal:'У этого ПК вентиляторы вращаются, но изображения нет. Зафиксируй симптом, найди причину и подтверди запуск.'},
     free: {title:'Свободная сборка', goal:'Собирай и разбирай ПК в своём порядке. Меняй по одному условию и проверяй результат.'}
@@ -48,6 +49,7 @@
     const assembled=task==='strip'||task==='diagnose';
     return {
       mode:'assembly', task, power:task==='diagnose', panelOpen:false, socketOpen:false,
+      monitorOn:true, monitorInput:'HDMI',
       paste:assembled?'used':'none', mains:assembled, psuSwitch:assembled,
       ...Object.fromEntries(Object.values(parts).map(part=>[part.key,assembled])),
       wiring:Object.fromEntries(Object.keys(cables).map(key=>[key,assembled&&!(task==='diagnose'&&key==='eps')])),
@@ -57,6 +59,9 @@
   }
 
   function has(s,id) {return Boolean(parts[id]&&s[parts[id].key]);}
+  function availableMounts(s) {
+    return Object.entries(parts).filter(([id])=>['BOARD','PSU','FANS'].includes(id)||has(s,'BOARD')).map(([,part])=>part.slot);
+  }
   function live(s) {return s.mains&&s.psuSwitch&&has(s,'PSU');}
   function accessIssue(s){
     if(s.power||s.mains)return 'Выключи ПК и отсоедини сетевой шнур перед работой внутри корпуса.';
@@ -87,6 +92,19 @@
     if(!has(s,'GPU')||!s.wiring.gpu)return 'noGpu';
     if(!s.wiring.monitor)return 'noMonitor';
     return has(s,'SSD')?'ready':'noSsd';
+  }
+
+  function monitorDisplay(s,phase=display(s)){
+    if(s.monitorOn===false)return {kind:'off',title:'Монитор выключен'};
+    const source=s.monitorInput||'HDMI';
+    if(source!=='HDMI'||!['ready','noSsd'].includes(phase))return {kind:'standby',title:'Нет сигнала',detail:source};
+    if(phase==='noSsd')return {kind:'firmware',title:'UEFI',detail:post.noSsd.screen};
+    return {kind:'desktop',title:post.ready.screen,detail:'POST пройден'};
+  }
+  function monitorIssue(s){
+    if(s.monitorOn===false)return 'Включи монитор кнопкой питания.';
+    if(s.monitorInput==='DP')return 'На мониторе выбран DisplayPort. Переключи вход на HDMI.';
+    return '';
   }
 
   const controlSteps={
@@ -142,6 +160,8 @@
     if(!s.mains)return controlSteps.connectMains;
     if(!s.psuSwitch)return controlSteps.switchOn;
     if(!s.power)return controlSteps.powerOn;
+    if(s.monitorOn===false)return {action:'monitorPower',label:'Включи монитор',body:'Нажми кнопку питания на мониторе.'};
+    if(s.monitorInput==='DP')return {action:'monitorInput',label:'Выбери вход HDMI',body:'Переключи источник сигнала на мониторе.'};
     if(s.task==='build')return controlSteps.finish;
     return {action:'checkDisplay',label:'Проверь экран',body:'На учебном экране видно, как запустилась система.'};
   }
@@ -154,6 +174,7 @@
   }
 
   function recommended(s) {
+    if(s.task==='solo')return 'Самостоятельная сборка. Подсказки отключены.';
     if(s.task==='build'||s.task==='free'){
       const step=nextBuildStep(s);
       if(step)return `${step.label}. ${step.body}`;
@@ -177,17 +198,19 @@
     return 'В разделе «Питание и запуск» подключи сетевой шнур, включи блок питания и нажми Power.';
   }
 
-  function act(s,action,target='') {
+  function act(s,action,target='',connector='') {
+    const solo=s.task==='solo';
     function result(text,ok=true,passed,recordedAction=action) {
       if(!ok)s.errors++;
+      if(!ok&&solo&&action!=='requestHint')text=action==='finish'?'Сборка ещё не прошла проверку.':'Действие не выполнено.';
       const entry={step:s.log.length+1,action:recordedAction,text,ok};
       s.log.push(entry);
       return {text,ok,passed};
     }
-    function change(text) {
+    function change(text,resetStart=true) {
       s.revision++;
       s.complete=false;
-      s.startAttempt=false;
+      if(resetStart)s.startAttempt=false;
       return result(text);
     }
     function inside() {
@@ -196,14 +219,27 @@
     }
     function checkDisplay(){
       const code=display(s);
-      if(code==='ready')s.testedAt=s.revision;
-      if(s.task==='diagnose'&&code==='noEps')s.observedSymptom=true;
-      const text=code==='off'||code==='noAc'?launchProblem(s):post[code].result;
-      const observation=result(text,true,code==='ready','checkDisplay');
+      const monitor=monitorDisplay(s,code),passed=monitor.kind==='desktop';
+      if(passed)s.testedAt=s.revision;
+      if(s.task==='diagnose'&&code==='noEps'&&!monitorIssue(s))s.observedSymptom=true;
+      const text=solo?(monitor.detail?monitor.title+' · '+monitor.detail:monitor.title):monitorIssue(s)||(code==='off'||code==='noAc'?launchProblem(s):post[code].result);
+      const observation=result(text,true,passed,'checkDisplay');
       s.evidence.push({action:'checkDisplay',text:observation.text,revision:s.revision,passed:observation.passed});
       return observation;
     }
-    if(action==='requestHint'){s.hintCount++;return result(recommended(s));}
+    if(action==='requestHint'){
+      if(solo)return {text:recommended(s),ok:false};
+      s.hintCount++;return result(recommended(s));
+    }
+    if(action==='monitorPower'){
+      s.monitorOn=s.monitorOn===false;
+      return change(s.monitorOn?'Монитор включён.':'Монитор выключен.',false);
+    }
+    if(action==='monitorInput'){
+      if(s.monitorOn===false)return result('Включи монитор кнопкой питания.',false);
+      s.monitorInput=s.monitorInput==='DP'?'HDMI':'DP';
+      return change('Вход монитора: '+s.monitorInput+'.',false);
+    }
     if(action==='inspectCable'){
       const cable=cables[target];
       if(!cable)return result('Выбери кабель из списка.',false);
@@ -221,6 +257,7 @@
         const missingCables=Object.keys(cables).filter(id=>!s.wiring[id]).map(id=>cables[id].name);
         if(missingCables.length)return result('Ещё нужно подключить: '+missingCables.join(', ')+'.',false);
         if(display(s)!=='ready')return result(launchProblem(s),false);
+        if(monitorIssue(s))return result(monitorIssue(s),false);
         if(s.testedAt!==s.revision)checkDisplay();
       }
       s.complete=true;
@@ -238,9 +275,9 @@
       if(code==='noCpu'||code==='noCooling'){
         s.power=false;
         s.startAttempt=code;
-        return result(post[code].result,true,false);
+        return result(solo?monitorDisplay(s).title:post[code].result,true,false);
       }
-      return result(post[code].result,true,code==='ready');
+      return result(solo?monitorDisplay(s,code).title:post[code].result,true,code==='ready');
     }
     if(action==='connectMains'||action==='disconnectMains'){
       if(s.power||s.psuSwitch)return result('Сначала выключи ПК и выключатель блока питания.',false);
@@ -264,10 +301,11 @@
       if(!cable)return result('Выбери кабель из списка.',false);
       if(target!=='monitor'){const blocked=inside();if(blocked)return blocked;}
       const installing=action==='attachCable';
+      if(installing&&solo&&connector!==cable.name)return result('Неверный разъём для кабеля.',false);
       if(installing&&!cable.needs.every(id=>has(s,id)))return result('Сначала установи оба узла для подключения кабеля.',false);
       if(s.wiring[target]===installing)return result('Положение кабеля уже совпадает с выбранным действием.',false);
       s.wiring[target]=installing;
-      return change(installing?'Кабель подключён. '+cable.name:'Кабель отсоединён. '+cable.name);
+      return change(installing?'Кабель подключён. '+cable.name:'Кабель отсоединён. '+cable.name,target!=='monitor');
     }
     const match=/^(install|remove)(BOARD|CPU|COOLER|RAM|SSD|GPU|PSU|FANS)$/.exec(action);
     if(match){
@@ -307,5 +345,5 @@
     return result('Это действие не предусмотрено в полной сборке.',false);
   }
 
-  return {parts,cables,tasks,post,create,has,live,display,act,recommended,installationIssue,nextBuildStep};
+  return {parts,cables,tasks,post,create,has,live,display,monitorDisplay,act,recommended,installationIssue,availableMounts,nextBuildStep};
 });

@@ -7,6 +7,7 @@ const micro=require('./micro-data.js').map(part=>({...part,...lessons.micro[part
 const model=read('model.js').trim()
  .replace('__MICRO_DATA__',()=>JSON.stringify(micro))
  .replace('__MICRO_INSPECTOR__',()=>read('micro-inspector.js').trim())
+ .replace('__ASSEMBLY_MONITOR__',()=>read('assembly-monitor.js').trim())
  .replace('__BOARD_ROUTE_OVERLAY__',()=>read('board-route-overlay.js').trim());
 if(/<\/script/i.test(model))throw Error('Escape closing script tags in model.js');
 const viewer=read('viewer-template.html').replace('__MODEL_DEFINITION__',()=>model).replace('</head>',()=>'<script>'+localization.replace(/<\/script/gi,'<\\/script')+'</script><script>'+read('i18n.js').replace(/<\/script/gi,'<\\/script')+'</script></head>');

@@ -22,6 +22,14 @@ p{margin:0;color:#c6d5de;line-height:1.5}.subtitle{max-width:900px}.badge{displa
 .assembly-placement-tag[data-snapped]::after{border-top-color:#a4edce}
 .assembly-carry-tag{transform:translateX(-50%);pointer-events:none;padding:4px 7px;border:1px solid #6f8e9f;border-radius:5px;background:#122431;color:#dce9ef}
 .assembly-placement-tag[hidden],.assembly-carry-tag[hidden]{display:none!important}
+.monitor-controls{position:absolute;z-index:4;display:flex;gap:4px;transform:translate(-50%,5px)}
+.monitor-controls[hidden]{display:none!important}
+#stage .monitor-controls button,#stage button.monitor-hdmi{min-height:30px;padding:4px 9px;border:1px solid #617e8e;border-radius:6px;background:#132530;color:#d8e8ef;font:600 11px/1.3 'Segoe UI',Arial,sans-serif;cursor:pointer}
+#stage .monitor-controls button:is(:hover,:focus-visible),#stage button.monitor-hdmi:is(:hover,:focus-visible){border-color:#e9b774;background:#253e4a}
+#stage .monitor-controls button[data-guided]{border-color:#f8c383;background:#f5c88a;color:#18232a}
+#stage .monitor-controls button[aria-pressed=true],#stage button.monitor-hdmi[aria-pressed=true]{color:#a4efca;border-color:#5da58a}
+#stage .monitor-controls button:disabled{opacity:.55;cursor:default}
+#stage button.monitor-hdmi{transform:translate(-50%,16px)}
 #labels{position:absolute;inset:0;pointer-events:none}#lines{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
 .tag{position:absolute;z-index:1;display:none;white-space:nowrap;padding:5px 8px;border:1px solid #b3d1dc;border-radius:7px;background:#15293de9;color:#fff;font-size:12px}
 .actions{display:flex;gap:8px;flex-wrap:wrap}button{background:#263b4a;border:1px solid #587082;border-radius:9px;color:#fff;padding:10px 13px;font:inherit;cursor:pointer}button:hover,button[aria-pressed="true"]{background:#39708a}
@@ -35,7 +43,7 @@ footer{color:#afc1cc;font-size:.86rem;margin:12px 0}
 <main>
  <h1 id="title"></h1><p class="subtitle" id="explanation"></p><span class="badge" id="status"></span>
  <div id="stage" aria-label="Интерактивная 3D-модель: перетаскивайте для вращения и нажмите на деталь"><div id="labels"><svg id="lines" aria-hidden="true"></svg></div></div>
- <div class="actions"><button id="explode" aria-pressed="false">Разобрать</button><button id="toggleLabels" aria-pressed="false">Показать подписи</button><button id="works">Как это работает</button><button id="reset">Исходный вид</button></div>
+ <div class="actions"><button id="explode" aria-pressed="false">Разобрать</button><button id="toggleLabels" aria-pressed="false">Показать подписи</button><button id="works">Как это работает</button><button id="reset">Исходный вид</button><button id="monitorFront" hidden>Монитор</button><button id="monitorBack" hidden>Разъёмы монитора</button></div>
  <section class="detail" aria-live="polite"><strong id="partName">Выберите деталь</strong><p id="partInfo">Нажмите на часть модели. Мышью вращайте, колесом приближайте.</p></section>
  <footer id="footnote"></footer>
 </main>
@@ -89,7 +97,7 @@ function addPart({name,info,group,explode=[0,0,0],explodePhase=[0,1],anchor=null
  tags.push({group,tag,line});return group;
 }
 // MODEL.build creates object-specific geometry and calls addPart for meaningful assemblies.
-MODEL.build({THREE,scene,objectRoot,addPart});
+MODEL.build({THREE,scene,objectRoot,addPart,orbit});
 if(!parts.length)throw new Error('The model has no selectable parts');
 if(!Array.isArray(MODEL.stages)||!MODEL.stages.length)throw new Error('How it works needs object-specific stages');
 for(const s of MODEL.stages)if(!parts.some(p=>p.userData.model.name===s.part)||!s.text)throw new Error('Invalid explanation stage: '+s.part);

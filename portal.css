@@ -176,6 +176,7 @@
 .assembly-detail .assembly-drag-hint { color: var(--muted); font-size: 11px; }
 .assembly-detail .assembly-placement-issue { color: var(--accent); font-size: 11px; }
 .assembly-guide-toggle { justify-self: start; }
+.mini-display.screen-in-3d { width: 1px; height: 1px; padding: 0; border: 0; clip-path: inset(50%); }
 .assembly-guide {
   display: grid;
   gap: 4px;

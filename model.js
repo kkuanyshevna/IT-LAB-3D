@@ -3,7 +3,7 @@
  explanation:'Среднеразмерный системный блок ATX и домашний роутер. Вращайте модель, приближайте детали и нажимайте на них. Кнопка «Разобрать» раскрывает внутреннее устройство.',
  status:'Реалистичная учебная реконструкция · ATX · без привязки к производителю',
  footnote:'Расположение разъёмов и размеры обобщены. Движущиеся линии показывают учебные связи между компонентами, а не электрическую схему или движение электронов. Внутренности блока питания не вскрываются.',
- build({THREE,scene,objectRoot,addPart}) {
+ build({THREE,scene,objectRoot,addPart,orbit}) {
   const M=(color,metalness=.35,roughness=.45)=>new THREE.MeshStandardMaterial({color,metalness,roughness});
   const black=M(0x20292e,.6,.4), steel=M(0x424e55,.78,.3), silver=M(0xaab6bc,.9,.25), pcb=M(0x16382e,.2,.7), dark=M(0x172026,.3,.7), gold=M(0xc6a35d,.8,.3), copper=M(0xb47742,.85,.3), white=M(0xc5d0d4,.2,.6), plastic=M(0x242c30,.1,.6), blue=M(0x226b99,.25,.4), green=M(0x489f76,.2,.5);
   const group=()=>new THREE.Group();
@@ -271,6 +271,8 @@
   const psuPins=[];for(let row=0;row<2;row++)for(let i=0;i<12;i++)psuPins.push({p:[-1.14+i*.12,.42+row*.09,1.115]});batch(psu,new THREE.BoxGeometry(.068,.055,.014),dark,psuPins);label(psu,'MODULAR DC',-.48,.99,1.115,1.2,.1);
   box(psu,-1.534,.83,-.22,.012,.11,.04,black);box(psu,-1.53,.89,-.22,.013,.012,.055,silver);
   register('Блок питания','Блок питания преобразует сетевое питание в напряжения, необходимые компонентам. Номинальная мощность сама по себе не определяет качество или совместимость. В тренажёре блок показан закрытым: внутреннее устройство не обслуживается.',psu,[-1.15,-.1,.7],[-.5,1.24,1.13]);
+  const createMonitor=__ASSEMBLY_MONITOR__;
+  const monitor=createMonitor({THREE,orbit,objectRoot,group,box,cyl,rounded,label,materials:{black,dark,steel,silver,gold}});
   const power=group();
   const harness=Object.fromEntries(['atx','eps','gpu','cpuFan','sysFan','frontPanel','monitor','mains'].map(key=>{
    const wire=group();wire.userData.serviceAssembly=true;power.add(wire);return [key,wire];
@@ -289,7 +291,9 @@
   label(board,'SYS_FAN',.64,1.39,-.943,.27,.04);
   tube(harness.frontPanel,[[1.09,5.61,.92],[1.45,4.2,-.32],[1.39,1.27,-.6],[.18,1.52,-.72]],.021,signalWire);
   box(harness.frontPanel,.18,1.52,-.69,.18,.068,.1,plastic);
-  tube(harness.monitor,[[-1.59,2.8,.25],[-1.97,2.64,.28],[-2.25,1.14,.33],[-2.65,.22,.82],[-3.27,.17,1.27]],.026,blue);
+  const [monitorX,monitorY,monitorZ]=monitor.cableEnd;
+  tube(harness.monitor,[[-1.59,2.8,.25],[-1.94,2.67,.13],[-2.02,1.2,-.16],[-2.25,.25,-.17],[-3.28,.16,.13],[monitorX,.23,monitorZ-.45],[monitorX,monitorY-.35,monitorZ-.35],monitor.cableEnd],.029,blue);
+  rounded(harness.monitor,monitorX,monitorY,monitorZ-.077,.23,.092,.19,plastic,.018).rotation.y=.22;
   rounded(harness.mains,-1.59,.8,-.75,.17,.25,.19,black,.025);
   tube(harness.mains,[[-1.66,.8,-.75],[-1.87,.75,-.68],[-1.99,.23,-.54],[-2.56,.16,-.3]],.033,plastic);
   for(const [x,y,z]of[[1.38,1.53,-.85],[1.38,3.55,-.86],[-1.3,2.4,-1.1]]){box(harness.atx,x,y,z,.075,.09,.34,steel);screw(harness.atx,x,y,z+.18);}
@@ -337,7 +341,7 @@
   carryTag.className='assembly-carry-tag';carryTag.textContent='Перетащи';carryTag.hidden=true;
   stageElement.append(placementTag,carryTag);
   let dragCamera=null,dragCanvas=stageElement.querySelector('canvas');
-  let dragConfig={enabled:false,parts:legacyParts,showTargets:true,targetSlot:null,wire:null,remove:false,canSnap:false};
+  let dragConfig={enabled:false,parts:legacyParts,showTargets:true,targetSlot:null,manualSlots:null,wire:null,remove:false,canSnap:false};
   let drag=null,dragListenersOn=false,trayNeedsLayout=true;
   placementTag.addEventListener('click',()=>{
    if(placementTag.hidden||drag||state.mode!=='assembly')return;
@@ -392,6 +396,7 @@
    }
    if(trayNeedsLayout)layoutDetachedTrays();
    updatePlacementTags();
+   monitor.update(projectPoint,camera);
   };
   let helper=null,focusGroup=null;
   function focus(name){if(helper){scene.remove(helper);helper.geometry.dispose();helper.material.dispose();helper=null;}const g=registry[name];if(!g)return false;focusGroup=g;helper=new THREE.BoxHelper(g,0xf4bf73);helper.material.depthTest=false;helper.renderOrder=20;scene.add(helper);document.getElementById('partName').textContent=name;document.getElementById('partInfo').textContent=g.userData.model.info;return true;}
@@ -425,8 +430,9 @@
    }
    trayNeedsLayout=false;applyHardwarePoses();
   }
-  function setState(next){
+  function setState(next,monitorInfo,guideAction){
    if(drag)cancelDrag();Object.assign(state,next);if(typeof state.gpuInstalled!=='boolean')state.gpuInstalled=true;
+   monitor.setState(state,monitorInfo,guideAction);
    applyHardwarePoses();if(Object.keys(componentNames).some(k=>!state[componentKeys[k]]))layoutDetachedTrays();
    connected.visible=state.cableConnected;disconnected.visible=!state.cableConnected;plug.position.set(...(state.cableConnected?[-1.8,3.96,-.83]:[-2.35,.17,1.1]));return {...state};
   }
@@ -436,7 +442,7 @@
    const canvasX=(p.x+1)*rect.width/2,canvasY=(1-p.y)*rect.height/2;
    return{x:rect.left+canvasX,y:rect.top+canvasY,canvasX,canvasY,visible:p.z>=-1&&p.z<=1&&canvasX>=0&&canvasX<=rect.width&&canvasY>=0&&canvasY<=rect.height};
   }
-  function activeSlots(){return state.mode==='assembly'?[dragConfig.targetSlot].filter(Boolean):legacySlots;}
+  function activeSlots(){return state.mode==='assembly'?(dragConfig.manualSlots||[dragConfig.targetSlot].filter(Boolean)):legacySlots;}
   function slotWorldPoint(key){return (slotOwners[key]||board).localToWorld(new THREE.Vector3(...slotAnchors[key]));}
   function sourcePoint(key){return componentGroups[key].localToWorld(new THREE.Vector3(...grabAnchors[key]));}
   function placeTagAt(element,x,y){
@@ -479,7 +485,7 @@
   function nearestSlot(x,y){
    const data=getDragTargets();if(!data.ready)return null;const radius=Math.max(24,Math.min(48,data.canvas.width*.04));
    if(dragConfig.remove){const p=data.targets.TRAY;return Math.abs(x-p.x)<data.canvas.width*.12&&Math.abs(y-p.y)<data.canvas.height*.15?'TRAY':null;}
-   if(state.mode==='assembly'){
+   if(state.mode==='assembly'&&!dragConfig.manualSlots){
     const key=dragConfig.targetSlot,center=data.targets[key];
     if(!dragConfig.showTargets||!center?.visible)return null;
     if(dragConfig.wire)return Math.hypot(x-center.x,y-center.y)<=40?key:null;
@@ -552,7 +558,7 @@
   function onDragCancel(event){if(drag&&event.pointerId===drag.pointerId){stopPointer(event);cancelDrag();}}
   function configureDrag(config={}){
    const allowed=Array.isArray(config.parts)?config.parts.filter(k=>Object.hasOwn(componentNames,k)):legacyParts;
-   dragConfig={enabled:config.enabled===true,parts:allowed,showTargets:config.showTargets!==false,targetSlot:Object.hasOwn(slotAnchors,config.targetSlot)?config.targetSlot:null,wire:config.wire||null,remove:config.remove===true,canSnap:config.canSnap===true,control:config.control||null,guided:config.guided===true};
+   dragConfig={enabled:config.enabled===true,parts:allowed,showTargets:config.showTargets!==false,targetSlot:Object.hasOwn(slotAnchors,config.targetSlot)?config.targetSlot:null,manualSlots:Array.isArray(config.manualSlots)?config.manualSlots.filter(key=>Object.hasOwn(slotAnchors,key)):null,wire:config.wire||null,remove:config.remove===true,canSnap:config.canSnap===true,control:config.control||null,guided:config.guided===true};
    if(!dragCanvas)dragCanvas=document.querySelector('#stage canvas');if(!dragCanvas)return{...dragConfig};
    if(!dragConfig.enabled)cancelDrag();
    if(dragConfig.enabled&&!dragListenersOn){for(const [name,fn]of[['pointerdown',onDragDown],['pointermove',onDragMove],['pointerup',onDragUp],['pointercancel',onDragCancel]])dragCanvas.addEventListener(name,fn,{capture:true});dragListenersOn=true;}
@@ -573,6 +579,13 @@
   const createBoardRouteOverlay=__BOARD_ROUTE_OVERLAY__;
   const microInspector=(__MICRO_INSPECTOR__)({THREE,board,microParts,objectRoot,createBoardRouteOverlay});
   let microEnabled=true,microDown=null;
+  let monitorDown=null;
+  dragCanvas.addEventListener('pointerdown',event=>{monitorDown=state.mode==='assembly'&&event.button===0?{x:event.clientX,y:event.clientY}:null;});
+  dragCanvas.addEventListener('pointerup',event=>{
+   const start=monitorDown;monitorDown=null;
+   if(!start||!dragCamera||Math.hypot(event.clientX-start.x,event.clientY-start.y)>7)return;
+   pointerRay(event);monitor.click(dragRaycaster);
+  });
   const microHitMaterial=new THREE.MeshBasicMaterial({visible:false});
   const microHitMeshes=microParts.filter(p=>p.id!=='pcb').flatMap(p=>[p.center,...(p.instances||[])].map(center=>{const mesh=new THREE.Mesh(new THREE.BoxGeometry(...p.size),microHitMaterial);mesh.position.set(...center);mesh.userData.microPick=p.id;board.add(mesh);return mesh;}));
   const microRay=new THREE.Raycaster(),microPointer=new THREE.Vector2();
