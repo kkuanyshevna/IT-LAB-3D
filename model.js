@@ -87,6 +87,36 @@
   const board=group();
   const texCanvas=document.createElement('canvas');texCanvas.width=1024;texCanvas.height=1536;const ctx=texCanvas.getContext('2d');const substrate=ctx.createLinearGradient(0,0,1024,1536);substrate.addColorStop(0,'#214d3e');substrate.addColorStop(.5,'#14372d');substrate.addColorStop(1,'#254e3d');ctx.fillStyle=substrate;ctx.fillRect(0,0,1024,1536);ctx.strokeStyle='#497961';ctx.lineWidth=1.2;for(let i=0;i<215;i++){const x=25+(i*97)%970,y=20+(i*137)%1460;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+25,y);ctx.lineTo(x+42,y+17);ctx.lineTo(x+42,y+60+(i%5)*12);ctx.stroke();}for(let i=0;i<320;i++){const x=15+(i*109)%995,y=25+(i*173)%1490;ctx.fillStyle=i%4===0?'#b9a064':'#739d80';ctx.beginPath();ctx.arc(x,y,i%4===0?3.6:1.7,0,Math.PI*2);ctx.fill();ctx.fillStyle='#16362c';ctx.beginPath();ctx.arc(x,y,1,0,Math.PI*2);ctx.fill();}ctx.fillStyle='#aec5ae';ctx.font='22px monospace';ctx.fillText('ITLAB   ATX  /  DDR4',56,80);ctx.fillText('M.2  PCIe',360,910);ctx.fillText('PCIEX16',160,1130);ctx.fillText('DIMM_A2     DIMM_B2',630,220);ctx.font='15px monospace';for(let i=0;i<12;i++)ctx.fillText('C'+(28+i),45+(i%4)*230,1150+Math.floor(i/4)*110);ctx.strokeStyle='#94b29a';ctx.strokeRect(15,15,994,1506);const boardTex=new THREE.CanvasTexture(texCanvas);boardTex.colorSpace=THREE.SRGBColorSpace;const boardMat=M(0xffffff,.15,.8);boardMat.map=boardTex;
   box(board,-.05,3.35,-1.0,2.9,3.95,.07,boardMat);
+  // Silkscreen surrounds the actual connector positions on this teaching model.
+  const print = (x,y) => [(x+1.5)/2.9*1024,(5.325-y)/3.95*1536];
+  ctx.strokeStyle='#bdd1b4';
+  ctx.lineWidth=1.5;
+  ctx.font='15px monospace';
+  const boardMarkings=[
+    [-1.18,5.16,.43,.19,'EPS12V'],[-.4,4.03,1.08,1.12,'CPU SOCKET'],
+    [.72,4.02,.78,1.8,'DIMM A/B'],[-.23,3.28,1.28,.34,'M2_1'],
+    [-.25,2.94,2.12,.2,'PCIEX16_1'],[1.22,3.04,.27,.87,'ATX_PWR'],
+    [.53,1.95,.84,.7,'PCH'],[.96,2.5,.2,.25,'U17'],[.18,1.52,.45,.18,'F_PANEL']
+  ];
+  for(const [x,y,w,h,caption] of boardMarkings){
+    const [left,top]=print(x-w/2,y+h/2);
+    const [right,bottom]=print(x+w/2,y-h/2);
+    ctx.strokeRect(left,top,right-left,bottom-top);
+    ctx.fillText(caption,left+2,top-5);
+    ctx.fillRect(left-4,top-4,5,5);
+  }
+  ctx.strokeStyle='#537d5e';
+  ctx.lineWidth=1.1;
+  for(const [from,to,count,spacing] of [[[.04,4.24],[.37,4.32],12,.023],[[-.45,3.54],[-.72,3.34],8,.019],[[.77,2.08],[1.13,1.94],8,.02]]){
+    for(let lane=0;lane<count;lane++){
+      const dy=(lane-(count-1)/2)*spacing;
+      const points=[[from[0],from[1]+dy],[(from[0]+to[0])/2,from[1]+dy],[to[0],to[1]+dy]];
+      ctx.beginPath();ctx.moveTo(...print(...points[0]));
+      for(const p of points.slice(1))ctx.lineTo(...print(...p));
+      ctx.stroke();
+    }
+  }
+  boardTex.needsUpdate=true;
   for(const x of [-1.38,1.27])for(const y of [1.48,3.35,5.17]){cyl(board,x,y,-.91,.065,.035,gold,'z');screw(board,x,y,-.87);}
   // Socket retention plate and lever remain visible in the exploded model.
   box(board,-.4,4.03,-.88,.99,1.04,.06,silver);box(board,-.4,4.03,-.835,.82,.86,.04,black);
@@ -148,6 +178,42 @@
   rounded(board,.94,2.22,-.92,.21,.1,.045,silver,.025);label(board,'XTAL',.94,2.22,-.892,.16,.04);
   box(board,.02,2.4,-.92,.064,.028,.025,black);box(board,-.017,2.4,-.92,.018,.032,.029,silver);box(board,.057,2.4,-.92,.018,.032,.029,silver);
   const ceramic=M(0xb8a17d,.05,.85);box(board,.15,2.4,-.92,.055,.035,.026,ceramic);for(const dx of [-.032,.032])box(board,.15+dx,2.4,-.92,.014,.037,.03,silver);
+  // Discrete passives have separate ceramic or dark bodies, metal ends, and solder pads.
+  const resistorBodies=[],capacitorBodies=[],metalEnds=[],solderPads=[];
+  function passive(x,y,vertical,isCapacitor){
+    const r=vertical?[0,0,Math.PI/2]:[0,0,0];
+    (isCapacitor?capacitorBodies:resistorBodies).push({p:[x,y,-.946],r});
+    for(const offset of [-.022,.022]){
+      const px=x+(vertical?0:offset),py=y+(vertical?offset:0);
+      metalEnds.push({p:[px,py,-.946],r});
+      solderPads.push({p:[px,py,-.963],r});
+    }
+  }
+  for(let n=0;n<10;n++){
+    const x=-.98+n*.112;
+    passive(x,4.835,n%2===0,n%3!==0);
+    passive(x,5.095,n%2!==0,n%4!==0);
+  }
+  for(let n=0;n<10;n++){
+    const y=3.6+n*.092;
+    passive(.252,y,true,n%3!==0);
+    passive(.29,y+.03,true,n%3===0);
+  }
+  for(let n=0;n<7;n++){
+    passive(-.7+n*.15,3.07,false,n%2===0);
+    passive(-.7+n*.15,3.47,false,n%2!==0);
+  }
+  batch(board,new THREE.BoxGeometry(.044,.023,.024),black,resistorBodies);
+  batch(board,new THREE.BoxGeometry(.044,.023,.024),ceramic,capacitorBodies);
+  batch(board,new THREE.BoxGeometry(.012,.028,.027),silver,metalEnds);
+  batch(board,new THREE.BoxGeometry(.023,.03,.006),gold,solderPads);
+  // Recessed PCIe sockets show the contacts and the gap for the card key.
+  const pcieContacts=[];
+  for(const y of [2.94,2.06])for(const edge of [-.024,.024])for(let pin=0;pin<45;pin++){
+    if(pin===9||pin===10)continue;
+    pcieContacts.push({p:[-1.08+pin*.037,y+edge,-.715]});
+  }
+  batch(board,new THREE.BoxGeometry(.009,.016,.009),gold,pcieContacts);
   label(board,'R16',.02,2.457,-.944,.09,.032);label(board,'C41',.15,2.457,-.944,.09,.032);
   box(board,-.81,3.28,-.88,.13,.29,.12,black);for(let i=0;i<12;i++)box(board,-.733,3.16+i*.021,-.817,.024,.012,.016,gold);
   cyl(board,.38,3.28,-.89,.048,.12,gold,'z');ring(board,.38,3.28,-.823,.033,.006,black);
@@ -354,7 +420,8 @@
    if(tutorialIndex>=0){state.power=tutorialIndex>=2;focus(tutorialTargets[tutorialIndex]);}
    return{index:tutorialIndex,power:state.power};
   }
-  const microInspector=(__MICRO_INSPECTOR__)({THREE,board,microParts,objectRoot});
+  const createBoardRouteOverlay=__BOARD_ROUTE_OVERLAY__;
+  const microInspector=(__MICRO_INSPECTOR__)({THREE,board,microParts,objectRoot,createBoardRouteOverlay});
   let microEnabled=true,microDown=null;
   const microHitMaterial=new THREE.MeshBasicMaterial({visible:false});
   const microHitMeshes=microParts.filter(p=>p.id!=='pcb').flatMap(p=>[p.center,...(p.instances||[])].map(center=>{const mesh=new THREE.Mesh(new THREE.BoxGeometry(...p.size),microHitMaterial);mesh.position.set(...center);mesh.userData.microPick=p.id;board.add(mesh);return mesh;}));

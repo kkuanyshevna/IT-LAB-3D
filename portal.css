@@ -35,3 +35,97 @@
 .language-toggle button:focus-visible {
   outline-offset: 1px;
 }
+
+.board-layout {
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas: "canvas tabs" "canvas sidebar";
+  row-gap: 10px;
+}
+#microCanvas { grid-area: canvas; }
+.board-sidebar { grid-area: sidebar; }
+.board-tabs {
+  grid-area: tabs;
+  display: flex;
+  padding: 3px;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--bg);
+}
+.board-tabs button {
+  flex: 1;
+  min-height: 30px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+.board-tabs button:hover { color: var(--text); }
+.board-tabs button[aria-pressed="true"] {
+  background: var(--panel);
+  color: var(--accent);
+}
+.board-panel {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+.board-panel[hidden] { display: none; }
+#boardRoutePanel { gap: 9px; }
+#boardRouteSelect {
+  min-height: 40px;
+  width: 100%;
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+}
+.board-route-steps, .board-route-controls { display: flex; gap: 8px; }
+.board-route-steps button {
+  flex: 1;
+  min-height: 28px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 12px;
+}
+.board-route-steps button:hover { color: var(--text); }
+.board-route-steps button[aria-current="step"] {
+  border-color: var(--route-color);
+  color: var(--route-color);
+}
+.board-route-scroll {
+  flex: 1;
+  overflow: auto;
+  scrollbar-width: thin;
+}
+.board-route-description {
+  margin: 3px 0 13px;
+  padding: 13px 12px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--route-color);
+  border-radius: 6px;
+  background: var(--panel);
+}
+.board-route-description span { color: var(--route-color); font: 11px Consolas, monospace; }
+.board-route-description h3 { margin: 4px 0 8px; line-height: 1.3; }
+.board-route-description p { color: var(--text); font-size: 13px; }
+.board-route-controls { padding-top: 8px; border-top: 1px solid var(--line); }
+.board-route-controls .primary { flex: 1; }
+@media (max-width: 760px) {
+  .board-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto auto;
+    grid-template-areas: "tabs" "canvas" "sidebar";
+  }
+  #boardDialog:has(#boardRoutesTab[aria-pressed="true"]) #microCanvas {
+    height: 44vh;
+    min-height: 240px;
+  }
+}

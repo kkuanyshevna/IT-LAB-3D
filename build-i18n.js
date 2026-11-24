@@ -19,6 +19,10 @@ module.exports=function buildI18n(){
  }
  if(tutorial.length!==kk.tutorial.length)throw Error('Tutorial translation count mismatch');
  tutorial.forEach((step,i)=>{add(step.title,kk.tutorial[i][0]);add(step.text,kk.tutorial[i][1]);});
+ for(const route of require('./board-routes.js')){
+   add(...route.label);
+   for(const step of route.steps){add(...step.title);add(...step.body);}
+ }
  // The viewer has concise stand-alone descriptions in addition to the detailed cards.
  for(const match of read('model.js').matchAll(/register\('([^']+)','([^']+)'/g)){const entry=kk.main[match[1]];if(entry)add(match[2],entry.what+' '+entry.how);}
  const script='window.ITLAB_I18N_DATA = '+JSON.stringify({strings,patterns:ui.patterns})+';';
