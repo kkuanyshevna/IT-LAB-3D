@@ -4,4 +4,34 @@
 
 :root{--knowledge-text:#c5d7df}.workspace{grid-template-columns:minmax(0,1fr) 390px}.selected-heading{border-bottom:1px solid var(--line);padding-bottom:17px;margin-bottom:18px}.selected-heading>span{display:block;color:var(--accent);font-size:10px;letter-spacing:1px;margin-bottom:9px}.selected-heading h2,.selected-heading h3{font-size:27px;line-height:1.2}.knowledge-section{margin:19px 0}.knowledge-section h4{font-size:12px;color:var(--blue);margin:0 0 7px;font-weight:650}.knowledge-section p{font-size:14px;line-height:1.7;color:var(--knowledge-text);margin:0}.knowledge-links{display:flex;flex-wrap:wrap;gap:7px}.knowledge-links .chip{font-size:12px;padding:6px 9px}.selection-notice{position:absolute;top:68px;left:18px;pointer-events:none;max-width:330px;border-left:3px solid var(--accent);background:#0b1c27ed;padding:10px 13px;border-radius:4px;box-shadow:0 6px 20px #0004}.selection-notice strong,.selection-notice span{display:block}.selection-notice strong{font-size:16px}.selection-notice span{font-size:11px;color:var(--muted);margin-top:4px}.board-layout{grid-template-columns:minmax(0,1fr) 420px}.board-sidebar{display:flex;flex-direction:column;overflow:hidden;min-height:0}#microSelect{height:40px;min-height:40px;font-size:13px;margin-bottom:8px}#microCard{flex:1;min-height:0;overflow:auto;scrollbar-width:thin;padding:14px 14px 10px 0}#microCard .knowledge-section p{font-size:14px;line-height:1.72;margin:0}#microCard .knowledge-section{margin:20px 0}#microCard h3{font-size:27px}.micro-nav{flex-shrink:0;padding-top:10px;border-top:1px solid var(--line)}.micro-note{margin-top:9px!important}.micro-callout{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 28px));background:#0c1e2af0;border:1px solid #517284;border-left:3px solid var(--accent);padding:12px 14px;border-radius:6px;pointer-events:none;box-shadow:0 8px 30px #0004}.micro-callout strong{display:block;font-size:18px;color:var(--text);line-height:1.3}.micro-callout span{display:block;font-size:12px;line-height:1.6;color:var(--knowledge-text);margin-top:7px}.micro-tooltip{position:absolute;pointer-events:none;z-index:2;background:#eabe7d;color:#10202a;font-size:12px;font-weight:600;padding:5px 9px;border-radius:4px;max-width:240px;box-shadow:0 3px 12px #0006}.mentor-connection{border:1px solid #947a50;border-left:3px solid var(--accent);background:#352c2080;padding:13px 15px;border-radius:6px}.mentor-connection strong{color:var(--accent);font-size:15px}.mentor-connection p{margin:6px 0 0;font-size:13px}.mentor-connection.connected{border-color:#56876d;background:#18382b80}.mentor-connection.connected strong{color:var(--green)}.mentor-selected{font-size:13px!important;color:var(--blue)!important}.mentor-message p{font-size:14px}.mentor-message strong{font-size:11px}#knowledgeSources a{font-size:12px}@media(min-width:1700px){.workspace{grid-template-columns:minmax(0,1fr) 420px}}@media(max-width:1300px){.workspace{grid-template-columns:minmax(0,1fr) 360px}.board-layout{grid-template-columns:minmax(0,1fr) 370px;gap:15px}.header-actions{gap:12px}.micro-callout{max-width:290px}}@media(max-width:1000px){.workspace{grid-template-columns:minmax(0,1fr) 330px}.board-layout{grid-template-columns:minmax(0,1fr) 330px}.header-note{display:none}.header-actions{gap:10px}}@media(max-width:760px){.workspace{display:flex}.board-layout{display:flex}.board-sidebar{overflow:visible}#microCard{overflow:visible}#microCanvas{flex-shrink:0}.micro-callout{max-width:230px}.micro-callout span{font-size:11px}.selection-notice{max-width:240px}.header-actions #openMentor{font-size:9px}}
 
-.language-toggle{flex-shrink:0;border:1px solid #e5b76b88;border-radius:8px;background:#f1bf7415;color:#ffcf87;padding:9px 13px;font:inherit;font-size:12px;font-weight:700;cursor:pointer}.language-toggle:hover{background:#f1bf742d}.language-toggle:focus-visible{outline:2px solid #ffcf87;outline-offset:3px}
+.language-toggle {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+}
+.language-toggle button {
+  min-width: 32px;
+  min-height: 24px;
+  padding: 0 5px;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: .03em;
+}
+.language-toggle button:hover {
+  background: var(--panel);
+  color: var(--text);
+}
+.language-toggle button[aria-pressed="true"] {
+  background: var(--accent);
+  color: #14212a;
+}
+.language-toggle button:focus-visible {
+  outline-offset: 1px;
+}

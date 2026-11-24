@@ -63,7 +63,12 @@ footer{color:#afc1cc;font-size:.86rem;margin:12px 0}
     doc.documentElement.lang=language;
   }
   function controls(){
-    if(!host)return;const button=host.document.getElementById('languageToggle');if(button){button.textContent=language==='ru'?'Қазақша':'Русский';button.setAttribute('aria-label',language==='ru'?'Қазақ тіліне ауысу':'Переключить на русский язык');button.dataset.i18nSkip='';}
+    const group=host?.document.getElementById('languageToggle');
+    if(!group)return;
+    group.setAttribute('aria-label',language==='kk'?'Интерфейс тілі':'Язык интерфейса');
+    for(const button of group.querySelectorAll('button[data-language]')){
+      button.setAttribute('aria-pressed',String(button.dataset.language===language));
+    }
   }
   function setLanguage(next,{persist=true}={}){
     if(next!=='ru'&&next!=='kk')return;language=next;
@@ -76,7 +81,18 @@ footer{color:#afc1cc;font-size:.86rem;margin:12px 0}
   function mount(window){
     host=window;try{const saved=window.localStorage.getItem('itlab.language');if(saved==='kk'||saved==='ru')language=saved;}catch{}
     try{if(window.parent!==window&&window.parent.ITLAB_I18N)language=window.parent.ITLAB_I18N.language;}catch{}
-    const start=()=>{apply(window.document);controls();observer=new window.MutationObserver(records=>{for(const record of records){if(record.type==='characterData')apply(record.target);else if(record.type==='attributes')apply(record.target);else for(const child of record.addedNodes)apply(child);}});observer.observe(window.document.documentElement,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['title','placeholder','aria-label','alt','content']});window.document.getElementById('languageToggle')?.addEventListener('click',()=>setLanguage(language==='ru'?'kk':'ru'));};
+    const start=()=>{
+      apply(window.document);
+      controls();
+      observer=new window.MutationObserver(records=>{for(const record of records){if(record.type==='characterData')apply(record.target);else if(record.type==='attributes')apply(record.target);else for(const child of record.addedNodes)apply(child);}});
+      observer.observe(window.document.documentElement,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['title','placeholder','aria-label','alt','content']});
+      const buttons=window.document.querySelectorAll('#languageToggle button[data-language]');
+      for(const button of buttons){
+        button.addEventListener('click',()=>{
+          if(button.dataset.language!==language)setLanguage(button.dataset.language);
+        });
+      }
+    };
     if(window.document.readyState==='loading')window.document.addEventListener('DOMContentLoaded',start,{once:true});else start();
   }
   return {translate,canonical:text=>reverse[normalize(text)]||text,apply,setLanguage,mount,get language(){return language;}};
