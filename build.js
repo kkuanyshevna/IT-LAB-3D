@@ -18,7 +18,7 @@ const viewer=read('viewer-template.html').replace('__MODEL_DEFINITION__',()=>mod
 fs.writeFileSync(path.join(root,'computer.html'),viewer);
 const data='window.ITLAB_VIEWER = '+JSON.stringify(Buffer.from(viewer,'utf8').toString('base64'))+';';
 fs.writeFileSync(path.join(root,'viewer-data.js'),data);
-let portal=read('portal.html').replace('<link rel="stylesheet" href="portal.css">',()=>'<style>'+read('portal.css')+'</style>');
+let portal=read('portal.html').replace(/<link rel="stylesheet" href="([a-z-]+\.css)">/g,(_,name)=>'<style>'+read(name)+'</style>');
 portal=portal.replace(/<script src="([a-z0-9-]+\.js)"><\/script>/g,(_,name)=>'<script>\n'+read(name).replace(/<\/script/gi,'<\\/script')+'\n</script>');
 fs.writeFileSync(path.join(root,'index.html'),portal);
 console.log('Built index.html and computer.html. The 3D workshop runs offline.');

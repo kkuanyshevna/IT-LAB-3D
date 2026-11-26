@@ -146,7 +146,7 @@ function fit(){
  camera.position.copy(initialDirection).multiplyScalar(distance);orbit.target.set(0,0,0);
  orbit.minDistance=radius*.3;orbit.maxDistance=radius*10;orbit.update();
 }
-function resize(){const w=stage.clientWidth,h=stage.clientHeight;camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h)}
+function resize(){const w=stage.clientWidth,h=stage.clientHeight;if(!w||!h)return;camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h)}
 new ResizeObserver(resize).observe(stage);resize();fit();
 
 let selected=null,disassembled=false,labelsOn=false,step=-1,down=null;
