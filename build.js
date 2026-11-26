@@ -10,6 +10,8 @@ const model=read('model.js').trim()
  .replace('__ASSEMBLY_USB__',()=>read('assembly-usb.js').trim())
  .replace('__ASSEMBLY_MONITOR__',()=>read('assembly-monitor.js').trim())
  .replace('__ASSEMBLY_DESKTOP__',()=>read('assembly-desktop.js').trim())
+ .replace('__LINUX_TERMINAL__',()=>read('linux-terminal.js').trim())
+ .replace('__LINUX_GUEST__',()=>read('linux-guest.js').trim())
  .replace('__BOARD_ROUTE_OVERLAY__',()=>read('board-route-overlay.js').trim());
 if(/<\/script/i.test(model))throw Error('Escape closing script tags in model.js');
 const viewer=read('viewer-template.html').replace('__MODEL_DEFINITION__',()=>model).replace('</head>',()=>'<script>'+localization.replace(/<\/script/gi,'<\\/script')+'</script><script>'+read('i18n.js').replace(/<\/script/gi,'<\\/script')+'</script></head>');
@@ -19,4 +21,4 @@ fs.writeFileSync(path.join(root,'viewer-data.js'),data);
 let portal=read('portal.html').replace('<link rel="stylesheet" href="portal.css">',()=>'<style>'+read('portal.css')+'</style>');
 portal=portal.replace(/<script src="([a-z0-9-]+\.js)"><\/script>/g,(_,name)=>'<script>\n'+read(name).replace(/<\/script/gi,'<\\/script')+'\n</script>');
 fs.writeFileSync(path.join(root,'index.html'),portal);
-console.log('Built index.html and computer.html. No external runtime dependencies.');
+console.log('Built index.html and computer.html. The 3D workshop runs offline.');

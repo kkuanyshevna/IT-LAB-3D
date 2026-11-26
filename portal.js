@@ -4,6 +4,10 @@
  const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  let mode='explore',state=E.create(),run=null,code='a = 7\nb = 5\nsum = a + b\nprint(sum)',selected='Материнская плата',ready=false,picked='RAM',slot='DIMM',extraLog=[],tour=-1,tourSeen=0,tourDone=false;
  const iframe=$('viewer'),model=()=>{try{return iframe.contentWindow.ITLAB_MODEL;}catch{return null;}};
+ window.addEventListener('message',event=>{
+  if(event.source===iframe.contentWindow&&event.data?.type==='itlab-monitor-expanded')
+   document.body.classList.toggle('monitor-expanded',event.data.open===true);
+ });
  let mentorConfigured=false,mentorHistory=[],mentorRound=0,mentorRequest=null,microSelected='pcb';
  const componentName={RAM:'Оперативная память',SSD:'SSD M.2',GPU:'Видеокарта'};
  const assembly=window.ITLAB_ASSEMBLY,assemblyUI=window.ITLAB_ASSEMBLY_VIEW;

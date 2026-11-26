@@ -14,7 +14,8 @@
  rounded(monitor,0,2.62,-.18,3.39,1.98,.11,rearCover,.09);
  rounded(monitor,0,2.66,.158,3.72,2.13,.025,dark,.04);
  const canvas=document.createElement('canvas');
- canvas.width=768;canvas.height=432;
+ const width=768,height=432;
+ canvas.width=width;canvas.height=height;
  const context=canvas.getContext('2d');
  const texture=new THREE.CanvasTexture(canvas);
  texture.colorSpace=THREE.SRGBColorSpace;
@@ -44,6 +45,9 @@
  rearLabel('DP',-.33,2.02,.26);
 
  const front=document.getElementById('monitorFront'),back=document.getElementById('monitorBack');
+ const fullButton=document.getElementById('monitorFullscreen');
+ const fullDialog=document.getElementById('monitorDialog');
+ const closeButton=document.getElementById('closeMonitor');
  const canvasHost=document.getElementById('stage');
  const viewerCanvas=canvasHost.querySelector('canvas');
  const createDesktop=__ASSEMBLY_DESKTOP__;
@@ -71,11 +75,50 @@
  }
  front.addEventListener('click',()=>{frame(false);if(info.kind==='desktop')viewerCanvas.focus({preventScroll:true});});
  back.addEventListener('click',()=>frame(true));
- viewerCanvas.addEventListener('keydown',event=>{
-  if(event.ctrlKey||event.metaKey||event.altKey||event.isComposing)return;
-  if(desktop.key(event.key))event.preventDefault();
- });
+ function keydown(event){
+  if(event.metaKey||event.altKey||event.isComposing||event.key==='Escape'&&fullDialog.open)return;
+  if(desktop.key(event.key,event.ctrlKey))event.preventDefault();
+ }
+ viewerCanvas.addEventListener('keydown',keydown);
  viewerCanvas.addEventListener('pointerleave',()=>desktop.move(null));
+ fullDialog.addEventListener('keydown',keydown);
+ let nativeFullscreen=false;
+ function scalePicture(scale){
+  canvas.width=width*scale;canvas.height=height*scale;
+  context.setTransform(scale,0,0,scale,0,0);
+  texture.dispose();
+  draw(true);
+ }
+ fullButton.addEventListener('click',()=>{
+  if(!monitor.visible||fullDialog.open)return;
+  fullDialog.querySelector('.monitor-picture').append(canvas);
+  scalePicture(2);
+  fullDialog.showModal();
+  window.parent.postMessage({type:'itlab-monitor-expanded',open:true},'*');
+  fullDialog.requestFullscreen?.().catch(()=>{});
+  canvas.focus({preventScroll:true});
+ });
+ closeButton.addEventListener('click',()=>fullDialog.close());
+ fullDialog.addEventListener('close',()=>{
+  if(document.fullscreenElement===fullDialog)document.exitFullscreen().catch(()=>{});
+  nativeFullscreen=false;
+  scalePicture(1);
+  desktop.move(null);
+  window.parent.postMessage({type:'itlab-monitor-expanded',open:false},'*');
+  if(!fullButton.hidden)fullButton.focus();
+ });
+ document.addEventListener('fullscreenchange',()=>{
+  if(document.fullscreenElement===fullDialog)nativeFullscreen=true;
+  else if(nativeFullscreen&&fullDialog.open)fullDialog.close();
+ });
+ function canvasPoint(event){
+  const rect=canvas.getBoundingClientRect();
+  return {x:(event.clientX-rect.left)/rect.width,y:1-(event.clientY-rect.top)/rect.height};
+ }
+ canvas.tabIndex=0;canvas.setAttribute('aria-label','Экран учебного компьютера');
+ canvas.addEventListener('pointermove',event=>desktop.move(canvasPoint(event)));
+ canvas.addEventListener('pointerleave',()=>desktop.move(null));
+ canvas.addEventListener('click',event=>{canvas.focus({preventScroll:true});desktop.click(canvasPoint(event));});
 
  let info={kind:'off',title:'Монитор выключен'},cache='',attempt;
  function draw(force=false){
@@ -84,7 +127,6 @@
   const key=[info.kind,info.title,info.detail,i18n?.language].join('|');
   if(key===cache&&!force)return;
   cache=key;
-  const {width,height}=canvas;
   const lit=info.kind==='desktop'||info.kind==='firmware';
   context.fillStyle='#090f14';
   context.fillRect(0,0,width,height);
@@ -96,13 +138,14 @@
    context.fillStyle='#e6f3f8';context.font='600 52px Arial';context.fillText(t(info.title),width/2,231,690);
    context.fillStyle='#9dd7d5';context.font='29px Arial';context.fillText(t(info.detail||''),width/2,283,690);
   }
-  texture.needsUpdate=true;
+  if(!fullDialog.open)texture.needsUpdate=true;
   indicator.color.setHex(info.kind==='off'?0x35464a:lit?0x82e0aa:0xd6a858);
  }
  window.addEventListener('itlab-language-change',()=>draw(true));
  function setState(s,display={kind:'standby',title:'Нет сигнала',detail:'HDMI'},guideAction,attemptId){
   monitor.visible=s.mode==='assembly';
-  front.hidden=back.hidden=!monitor.visible;
+  front.hidden=back.hidden=fullButton.hidden=!monitor.visible;
+  if(!monitor.visible&&fullDialog.open)fullDialog.close();
   const active=monitor.visible&&display.kind==='desktop';
   desktop.update(s,active);
   viewerCanvas.tabIndex=active?0:-1;

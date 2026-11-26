@@ -1,5 +1,11 @@
 (context,redraw)=>{
- const tiles=[{id:'notes',title:'Заметки',icon:'≡',x:43,y:152},{id:'usb',title:'Устройства USB',icon:'⌁',x:43,y:270}];
+ const createTerminal=__LINUX_TERMINAL__;
+ const terminal=createTerminal(redraw);
+ const tiles=[
+  {id:'notes',title:'Заметки',icon:'≡',x:43,y:152},
+  {id:'usb',title:'Устройства USB',icon:'⌁',x:43,y:270},
+  {id:'terminal',title:'Терминал Linux',icon:'>_',x:376,y:152}
+ ];
  const close={x:672,y:66,w:48,h:39};
  const devices={keyboard:'Клавиатура',mouse:'Мышь'};
  let usb={},active=false,app='',draft='',cursor=null;
@@ -9,9 +15,10 @@
   usb=state.usb||{};
   active=enabled;
   if(!active||!usb.mouse)cursor=null;
+  if(state.mode!=='assembly'||!state.power){if(app==='terminal')app='';terminal.stop();}
  }
  function reset(){
-  app='';draft='';cursor=null;
+  app='';draft='';cursor=null;terminal.stop();
  }
  function fill(x,y,w,h,color){
   context.fillStyle=color;context.fillRect(x,y,w,h);
@@ -41,7 +48,19 @@
    text(tr(tiles.find(tile=>tile.id===app).title),65,91,26);
    fill(close.x,close.y,close.w,close.h,'#38596b');
    text('×',696,95,27,'#e8f5f5','center');
-   if(app==='usb'){
+   if(app==='terminal'){
+    fill(54,120,659,239,'#0a1520');
+    const {status,lines,column}=terminal.getState();
+    if(status==='error'||status==='offline'){
+     text(tr(status==='offline'?'Открой проект через локальный сервер.':'Linux не загрузился. Закрой и открой терминал ещё раз.'),66,154,17,'#eebf94');
+    }else{
+     const message=status==='ready'?(usb.keyboard?'Buildroot Linux · BusyBox':'Подключи USB-клавиатуру'):'Загрузка Buildroot Linux…';
+     text(tr(message),66,144,16,'#8ec4b2');
+     context.fillStyle='#d9ede6';context.font='13px Consolas, monospace';context.textAlign='left';
+     lines.forEach((line,index)=>context.fillText(line,65,167+index*19,636));
+     if(status==='ready'&&usb.keyboard&&column!==null)fill(65+column*7.18,171+(lines.length-1)*19,7,2,'#b3f4d5');
+    }
+   }else if(app==='usb'){
     Object.entries(devices).forEach(([id,label],index)=>{
      const y=168+88*index;
      text(tr(label),66,y,25);text(usb[id]?'USB '+usb[id]:tr('Не подключено'),66,y+37,22,usb[id]?'#a1e6bf':'#aec0c9');
@@ -80,14 +99,20 @@
    if(contains(x,y,close))app='';
   }else{
    const tile=tiles.find(tile=>contains(x,y,{...tile,w:294,h:84}));
-   if(tile)app=tile.id;
+   if(tile){
+    app=tile.id;
+    if(app==='terminal')terminal.open();
+   }
   }
   redraw();
   return true;
  }
- function key(value){
+ function key(value,ctrl=false){
   if(!active||!usb.keyboard)return false;
   if(value==='Escape'&&app){app='';redraw();return true;}
+  if(value==='F2'){app='terminal';terminal.open();redraw();return true;}
+  if(app==='terminal')return terminal.key(value,ctrl);
+  if(ctrl)return false;
   if(value==='Enter'&&!app){app='notes';redraw();return true;}
   if(app==='usb')return false;
   const letter=Array.from(value).length===1&&value>=' ';
@@ -100,5 +125,5 @@
   redraw();
   return true;
  }
- return {update,reset,paint,move,click,key,getState:()=>({app,draft,active})};
+ return {update,reset,paint,move,click,key,getState:()=>({app,draft,active,terminal:terminal.getState()})};
 }
