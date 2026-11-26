@@ -30,6 +30,12 @@ p{margin:0;color:#c6d5de;line-height:1.5}.subtitle{max-width:900px}.badge{displa
 #stage .monitor-controls button[aria-pressed=true],#stage button.monitor-hdmi[aria-pressed=true]{color:#a4efca;border-color:#5da58a}
 #stage .monitor-controls button:disabled{opacity:.55;cursor:default}
 #stage button.monitor-hdmi{transform:translate(-50%,16px)}
+#stage .usb-tag{position:absolute;z-index:4;min-height:26px;padding:3px 8px;white-space:nowrap;border:1px solid #617e8e;border-radius:6px;background:#142833;color:#d9edf3;font:600 11px/1.3 'Segoe UI',Arial,sans-serif}
+.usb-tag[hidden]{display:none!important}
+#stage .usb-device{transform:translate(-50%,4px)}
+#stage .usb-port{transform:translate(24px,-50%)}
+#stage .usb-tag[data-connected]{border-color:#5da58a;color:#a4efca}
+#stage .usb-tag[aria-pressed=true],#stage .usb-tag:hover:not(:disabled){border-color:#f8c383;color:#f9ce91}
 #labels{position:absolute;inset:0;pointer-events:none}#lines{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
 .tag{position:absolute;z-index:1;display:none;white-space:nowrap;padding:5px 8px;border:1px solid #b3d1dc;border-radius:7px;background:#15293de9;color:#fff;font-size:12px}
 .actions{display:flex;gap:8px;flex-wrap:wrap}button{background:#263b4a;border:1px solid #587082;border-radius:9px;color:#fff;padding:10px 13px;font:inherit;cursor:pointer}button:hover,button[aria-pressed="true"]{background:#39708a}
@@ -43,7 +49,7 @@ footer{color:#afc1cc;font-size:.86rem;margin:12px 0}
 <main>
  <h1 id="title"></h1><p class="subtitle" id="explanation"></p><span class="badge" id="status"></span>
  <div id="stage" aria-label="Интерактивная 3D-модель: перетаскивайте для вращения и нажмите на деталь"><div id="labels"><svg id="lines" aria-hidden="true"></svg></div></div>
- <div class="actions"><button id="explode" aria-pressed="false">Разобрать</button><button id="toggleLabels" aria-pressed="false">Показать подписи</button><button id="works">Как это работает</button><button id="reset">Исходный вид</button><button id="monitorFront" hidden>Монитор</button><button id="monitorBack" hidden>Разъёмы монитора</button></div>
+ <div class="actions"><button id="explode" aria-pressed="false">Разобрать</button><button id="toggleLabels" aria-pressed="false">Показать подписи</button><button id="works">Как это работает</button><button id="reset">Исходный вид</button><button id="monitorFront" hidden>Монитор</button><button id="monitorBack" hidden>Разъёмы монитора</button><button id="usbView" hidden>USB-порты</button><button id="keyboardView" hidden>Клавиши</button></div>
  <section class="detail" aria-live="polite"><strong id="partName">Выберите деталь</strong><p id="partInfo">Нажмите на часть модели. Мышью вращайте, колесом приближайте.</p></section>
  <footer id="footnote"></footer>
 </main>

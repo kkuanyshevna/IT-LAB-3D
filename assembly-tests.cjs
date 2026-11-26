@@ -58,19 +58,43 @@ test('an early finish reports the exact missing part, cable or power step',()=>{
   assert.equal(s.complete,false);
 });
 
-test('unaided assembly validates manual destinations and suppresses hints and repair instructions',()=>{
+test('unaided assembly validates manual destinations and explains an incomplete final check',()=>{
   const s=lab.create('solo');
   assert.equal(lab.nextBuildStep(s),null);
   assert.deepEqual(lab.availableMounts(s),['ATX TRAY','PSU BAY','FAN MOUNT']);
   assert.equal(lab.act(s,'requestHint').ok,false);
   assert.equal(s.hintCount,0);
   assert.equal(s.log.length,0);
-  assert.equal(lab.act(s,'finish').text,'Сборка ещё не прошла проверку.');
+  assert.match(lab.act(s,'finish').text,/Материнская плата/);
   mount(s);
   assert.equal(lab.act(s,'attachCable','eps','ATX 24-pin').text,'Действие не выполнено.');
   assert.equal(s.wiring.eps,false);
   wire(s);turnOn(s);
   assert.equal(apply(s,'finish').passed,true);
+});
+
+test('a visible boot can still require SYS_FAN for the assembly checklist',()=>{
+  const s=lab.create('solo');
+  mount(s);wire(s,['sysFan']);turnOn(s);
+  assert.equal(lab.monitorDisplay(s).kind,'desktop');
+  assert.match(lab.act(s,'finish').text,/ПК загрузился.*SYS_FAN/);
+});
+
+test('rear USB ports accept either device, reject conflicts and preserve a completed build',()=>{
+  const s=lab.create('build');
+  assert.equal(lab.act(s,'connectUsb','keyboard',1).ok,false);
+  mount(s);wire(s);turnOn(s);apply(s,'finish');
+  apply(s,'connectUsb','keyboard',1);
+  assert.equal(lab.act(s,'connectUsb','mouse',1).ok,false);
+  assert.equal(lab.act(s,'connectUsb','mouse',4).ok,false);
+  apply(s,'connectUsb','mouse',2);
+  assert.deepEqual(s.usb,{keyboard:1,mouse:2});
+  apply(s,'disconnectUsb','keyboard');
+  apply(s,'connectUsb','keyboard',3);
+  apply(s,'monitorInput');apply(s,'monitorInput');
+  assert.equal(s.complete,true);
+  assert.equal(s.power,true);
+  assert.equal(lab.monitorDisplay(s).kind,'desktop');
 });
 
 test('monitor power, HDMI and the selected input control the visible result without powering off the PC',()=>{

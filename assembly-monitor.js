@@ -45,6 +45,9 @@
 
  const front=document.getElementById('monitorFront'),back=document.getElementById('monitorBack');
  const canvasHost=document.getElementById('stage');
+ const viewerCanvas=canvasHost.querySelector('canvas');
+ const createDesktop=__ASSEMBLY_DESKTOP__;
+ const desktop=createDesktop(context,()=>draw(true));
  const controls=document.createElement('div');
  controls.className='monitor-controls';controls.hidden=true;
  const power=document.createElement('button'),input=document.createElement('button'),cable=document.createElement('button');
@@ -66,46 +69,46 @@
   orbit.object.position.copy(monitor.localToWorld(new THREE.Vector3(rear?-.4:.12,2.65,(rear?-1:1)*6.5/narrow)));
   orbit.update();
  }
- front.addEventListener('click',()=>frame(false));
+ front.addEventListener('click',()=>{frame(false);if(info.kind==='desktop')viewerCanvas.focus({preventScroll:true});});
  back.addEventListener('click',()=>frame(true));
+ viewerCanvas.addEventListener('keydown',event=>{
+  if(event.ctrlKey||event.metaKey||event.altKey||event.isComposing)return;
+  if(desktop.key(event.key))event.preventDefault();
+ });
+ viewerCanvas.addEventListener('pointerleave',()=>desktop.move(null));
 
- let info={kind:'off',title:'Монитор выключен'},cache='';
- function draw(){
+ let info={kind:'off',title:'Монитор выключен'},cache='',attempt;
+ function draw(force=false){
   const i18n=window.ITLAB_I18N;
   const t=text=>i18n?.translate(text)||text;
   const key=[info.kind,info.title,info.detail,i18n?.language].join('|');
-  if(key===cache)return;
+  if(key===cache&&!force)return;
   cache=key;
   const {width,height}=canvas;
   const lit=info.kind==='desktop'||info.kind==='firmware';
   context.fillStyle='#090f14';
-  if(info.kind==='desktop'){
-   const gradient=context.createLinearGradient(0,0,width,height);
-   gradient.addColorStop(0,'#10304a');gradient.addColorStop(1,'#154737');
-   context.fillStyle=gradient;
-  }
   context.fillRect(0,0,width,height);
-  if(info.kind!=='off'){
+  if(info.kind==='desktop')desktop.paint();
+  else if(info.kind!=='off'){
    context.fillStyle=lit?'#99ddda':'#8cacc2';context.font='600 25px Arial';context.textAlign='left';
    context.fillText(info.kind==='firmware'?'IT LAB · UEFI':'IT LAB',32,54);
    context.textAlign='center';
-   if(info.kind==='desktop'){
-    context.strokeStyle='#9ee7bf';context.lineWidth=5;context.beginPath();context.arc(384,135,30,0,2*Math.PI);context.stroke();
-    context.beginPath();context.moveTo(368,135);context.lineTo(380,147);context.lineTo(400,122);context.stroke();
-   }
    context.fillStyle='#e6f3f8';context.font='600 52px Arial';context.fillText(t(info.title),width/2,231,690);
    context.fillStyle='#9dd7d5';context.font='29px Arial';context.fillText(t(info.detail||''),width/2,283,690);
-   if(info.kind==='desktop'){context.fillStyle='#153442';context.fillRect(0,height-37,width,37);}
   }
   texture.needsUpdate=true;
   indicator.color.setHex(info.kind==='off'?0x35464a:lit?0x82e0aa:0xd6a858);
  }
- window.addEventListener('itlab-language-change',draw);
- function setState(s,display={kind:'standby',title:'Нет сигнала',detail:'HDMI'},guideAction){
+ window.addEventListener('itlab-language-change',()=>draw(true));
+ function setState(s,display={kind:'standby',title:'Нет сигнала',detail:'HDMI'},guideAction,attemptId){
   monitor.visible=s.mode==='assembly';
   front.hidden=back.hidden=!monitor.visible;
+  const active=monitor.visible&&display.kind==='desktop';
+  desktop.update(s,active);
+  viewerCanvas.tabIndex=active?0:-1;
   if(!monitor.visible)return;
-  info=display;draw();
+  if(attempt!==attemptId){attempt=attemptId;desktop.reset();}
+  info=display;draw(active);
   power.setAttribute('aria-pressed',String(s.monitorOn!==false));
   power.toggleAttribute('data-guided',guideAction==='monitorPower');
   input.textContent=s.monitorInput||'HDMI';input.disabled=s.monitorOn===false;
@@ -132,9 +135,17 @@
  function click(raycaster){
   if(!monitor.visible)return;
   const hit=raycaster.intersectObjects(monitor.children,false)[0];
+  if(hit?.object===screen&&info.kind==='desktop'){
+   viewerCanvas.focus({preventScroll:true});desktop.click(hit.uv);return;
+  }
   const action=hitAreas.get(hit?.object);
   if(action)send(action);
  }
+ function move(raycaster){
+  if(!monitor.visible||info.kind!=='desktop')return;
+  const hit=raycaster.intersectObject(screen,false)[0];
+  desktop.move(hit?.uv);
+ }
  function anchor(point){return point.clone().applyEuler(monitor.rotation).add(monitor.position).toArray();}
- return {setState,update,click,cableEnd:anchor(hdmiPoint)};
+ return {setState,update,click,move,pressKey:desktop.key,getDesktopState:desktop.getState,cableEnd:anchor(hdmiPoint)};
 }

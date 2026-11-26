@@ -1,6 +1,6 @@
 (function() {
   'use strict';
-  const {parts,cables,tasks,has,live,display,installationIssue,availableMounts,nextBuildStep}=window.ITLAB_ASSEMBLY;
+  const {parts,cables,tasks,usbDevices,usbPorts,has,live,display,installationIssue,availableMounts,nextBuildStep}=window.ITLAB_ASSEMBLY;
   const esc=text=>text.replace(/[&<>]/g,value=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[value]));
   const taskOptions=(selected,includeQuick)=>Object.entries(tasks).map(([id,task])=>`<option value="${id}"${id===selected?' selected':''}>${task.title}</option>`).join('')+(includeQuick?`<option value="quick"${selected==='quick'?' selected':''}>Быстрая сборка RAM, SSD и GPU</option>`:'');
   const taskSelector=selected=>`<label for="assemblyTask">Задание</label><select id="assemblyTask" class="assembly-select">${taskOptions(selected,true)}</select>`;
@@ -30,6 +30,17 @@
       <div class="assembly-pair">${button('inspectCable','Проверить кабель',selected)}
       ${button(connected?'detachCable':'attachCable',connected?'Отсоединить кабель':'Подключить кабель',selected,connected?'secondary':'primary')}</div></div>`;
   }
+  function usbControls(s,view,button){
+    const devices=Object.fromEntries(Object.entries(usbDevices).map(([id,name])=>[id,{name}]));
+    const ports=usbPorts.map(port=>`<button type="button" class="secondary" data-usb-port="${port}" ${view.usb&&s.boardInstalled?'':'disabled'}>USB ${port}</button>`).join('');
+    return `${choices(devices,view.usb,id=>s.usb[id],'data-assembly-usb')}
+      <div class="assembly-detail">
+        <p>${s.boardInstalled?'Выбери устройство, затем USB-порт сзади корпуса.':'USB-порты появятся после установки материнской платы.'}</p>
+        <div class="assembly-pair">${ports}</div>
+        ${view.usb&&s.usb[view.usb]?button('disconnectUsb','Отсоединить '+(view.usb==='keyboard'?'клавиатуру':'мышь'),view.usb,'secondary full'):''}
+        ${s.power&&(s.usb.keyboard||s.usb.mouse)?'<p>Открой «Монитор». Нажми «Заметки» и напечатай текст.</p>':''}
+      </div>`;
+  }
   function render(s,view){
     const count=Object.keys(parts).filter(id=>has(s,id)).length;
     const connected=Object.values(s.wiring).filter(Boolean).length;
@@ -55,8 +66,9 @@
       <div class="assembly-tabs" role="group" aria-label="Действия сборки">
         <button type="button" data-assembly-tab="parts" aria-pressed="${view.tab==='parts'}">Детали</button>
         <button type="button" data-assembly-tab="wires" aria-pressed="${view.tab==='wires'}">Кабели</button>
+        <button type="button" data-assembly-tab="usb" aria-pressed="${view.tab==='usb'}">USB · ${Object.values(s.usb).filter(Boolean).length}/2</button>
       </div>
-      ${view.tab==='parts'?hardware(s,view.part,button,step):wiring(s,view.wire,button,step)}
+      ${view.tab==='usb'?usbControls(s,view,button):view.tab==='parts'?hardware(s,view.part,button,step):wiring(s,view.wire,button,step)}
       <button id="restart" class="quiet full">Начать заново ↻</button>
     </div>`;
   }

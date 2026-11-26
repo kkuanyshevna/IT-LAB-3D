@@ -273,6 +273,9 @@
   register('Блок питания','Блок питания преобразует сетевое питание в напряжения, необходимые компонентам. Номинальная мощность сама по себе не определяет качество или совместимость. В тренажёре блок показан закрытым: внутреннее устройство не обслуживается.',psu,[-1.15,-.1,.7],[-.5,1.24,1.13]);
   const createMonitor=__ASSEMBLY_MONITOR__;
   const monitor=createMonitor({THREE,orbit,objectRoot,group,box,cyl,rounded,label,materials:{black,dark,steel,silver,gold}});
+  const createUsb=__ASSEMBLY_USB__;
+  const portPositions=Object.fromEntries([4.71,4.4,4.09].map((y,index)=>[index+1,[-1.68,y,-.4]]));
+  const usb=createUsb({THREE,orbit,objectRoot,group,box,rounded,tube,materials:{black,steel,plastic,blue,green},portPositions,pressKey:monitor.pressKey});
   const power=group();
   const harness=Object.fromEntries(['atx','eps','gpu','cpuFan','sysFan','frontPanel','monitor','mains'].map(key=>{
    const wire=group();wire.userData.serviceAssembly=true;power.add(wire);return [key,wire];
@@ -397,6 +400,7 @@
    if(trayNeedsLayout)layoutDetachedTrays();
    updatePlacementTags();
    monitor.update(projectPoint,camera);
+   usb.update(projectPoint,camera);
   };
   let helper=null,focusGroup=null;
   function focus(name){if(helper){scene.remove(helper);helper.geometry.dispose();helper.material.dispose();helper=null;}const g=registry[name];if(!g)return false;focusGroup=g;helper=new THREE.BoxHelper(g,0xf4bf73);helper.material.depthTest=false;helper.renderOrder=20;scene.add(helper);document.getElementById('partName').textContent=name;document.getElementById('partInfo').textContent=g.userData.model.info;return true;}
@@ -430,9 +434,10 @@
    }
    trayNeedsLayout=false;applyHardwarePoses();
   }
-  function setState(next,monitorInfo,guideAction){
+  function setState(next,monitorInfo,guideAction,usbDevice,attemptId){
    if(drag)cancelDrag();Object.assign(state,next);if(typeof state.gpuInstalled!=='boolean')state.gpuInstalled=true;
-   monitor.setState(state,monitorInfo,guideAction);
+   monitor.setState(state,monitorInfo,guideAction,attemptId);
+   usb.setState(state,usbDevice);
    applyHardwarePoses();if(Object.keys(componentNames).some(k=>!state[componentKeys[k]]))layoutDetachedTrays();
    connected.visible=state.cableConnected;disconnected.visible=!state.cableConnected;plug.position.set(...(state.cableConnected?[-1.8,3.96,-.83]:[-2.35,.17,1.1]));return {...state};
   }
@@ -584,7 +589,11 @@
   dragCanvas.addEventListener('pointerup',event=>{
    const start=monitorDown;monitorDown=null;
    if(!start||!dragCamera||Math.hypot(event.clientX-start.x,event.clientY-start.y)>7)return;
-   pointerRay(event);monitor.click(dragRaycaster);
+   pointerRay(event);if(!usb.click(dragRaycaster))monitor.click(dragRaycaster);
+  });
+  dragCanvas.addEventListener('pointermove',event=>{
+   if(state.mode!=='assembly'||!dragCamera||drag||event.buttons)return;
+   pointerRay(event);monitor.move(dragRaycaster);
   });
   const microHitMaterial=new THREE.MeshBasicMaterial({visible:false});
   const microHitMeshes=microParts.filter(p=>p.id!=='pcb').flatMap(p=>[p.center,...(p.instances||[])].map(center=>{const mesh=new THREE.Mesh(new THREE.BoxGeometry(...p.size),microHitMaterial);mesh.position.set(...center);mesh.userData.microPick=p.id;board.add(mesh);return mesh;}));
@@ -601,7 +610,7 @@
    if(!microEnabled)return;
    const rect=dragCanvas.getBoundingClientRect();microPointer.set((e.clientX-rect.left)/rect.width*2-1,1-(e.clientY-rect.top)/rect.height*2);microRay.setFromCamera(microPointer,dragCamera);scene.updateMatrixWorld(true);const hit=microRay.intersectObjects(microHitMeshes,false)[0];if(!hit)return;const actual=[];for(const g of Object.values(registry))g.traverse(n=>{if(n.isMesh&&!n.userData.microPick&&visibleMesh(n,g))actual.push(n);});const surface=microRay.intersectObjects(actual,false)[0];if(surface&&Math.abs(surface.distance-hit.distance)<.16)window.parent.postMessage({type:'itlab-micro-selection',id:hit.object.userData.microPick},'*');
   });
-  window.ITLAB_MODEL={focus,setState,setTutorial,configureDrag,getDragTargets,microInspector,setMicroEnabled:value=>microEnabled=value===true,getMicroParts:()=>microParts.map(p=>({...p})),getState:()=>({...state}),names:Object.keys(registry),getTutorialState:()=>({index:tutorialIndex,activeRoutes:tutorialRoutes.filter(r=>r.route.visible).length,power:state.power,fanAngle:spins[0].rotation.z,marker:tutorialIndex>=0?tutorialRoutes[tutorialIndex].markers[0].position.toArray():null}),getMetrics:()=>({...lastMetrics})};
+  window.ITLAB_MODEL={focus,setState,setTutorial,configureDrag,getDragTargets,showUsbPorts:usb.showPorts,getDesktopState:monitor.getDesktopState,microInspector,setMicroEnabled:value=>microEnabled=value===true,getMicroParts:()=>microParts.map(p=>({...p})),getState:()=>({...state}),names:Object.keys(registry),getTutorialState:()=>({index:tutorialIndex,activeRoutes:tutorialRoutes.filter(r=>r.route.visible).length,power:state.power,fanAngle:spins[0].rotation.z,marker:tutorialIndex>=0?tutorialRoutes[tutorialIndex].markers[0].position.toArray():null}),getMetrics:()=>({...lastMetrics})};
   // Reuse the viewer's OrbitControls for closer framing of this compact assembly.
   // Geometry, controls and free rotation stay in the standard interaction shell.
   document.getElementById('explode').addEventListener('click',()=>setTimeout(()=>{

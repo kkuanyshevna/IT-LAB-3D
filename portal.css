@@ -141,6 +141,7 @@
 .assembly-progress b, .assembly-progress .good { color: var(--green); }
 .assembly-pair, .assembly-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
 .assembly-pair > button, .assembly-tabs > button { flex: 1 1 110px; }
+.assembly-tabs > button, .assembly-detail [data-usb-port] { flex-basis: 60px; }
 .assembly-power { border: 1px solid var(--line); border-radius: 6px; padding: 6px 9px; }
 .assembly-power summary { min-height: 28px; padding-top: 4px; cursor: pointer; }
 .assembly-power[open] .assembly-pair { padding: 8px 0 2px; }

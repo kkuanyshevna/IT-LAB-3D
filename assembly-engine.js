@@ -23,6 +23,8 @@
     frontPanel: {name:'F_PANEL', needs:['BOARD'], note:'Кнопка Power на корпусе передаёт сигнал через PWR_SW.'},
     monitor: {name:'HDMI', needs:['GPU'], note:'Видеовыход видеокарты соединяется с монитором.'}
   };
+  const usbDevices={keyboard:'Клавиатура',mouse:'Мышь'};
+  const usbPorts=[1,2,3];
   const tasks = {
     build: {title:'Собрать ПК с нуля', goal:'Установи все детали, подключи кабели и проверь запуск учебной системы.'},
     solo: {title:'Собрать ПК без подсказок', goal:'Собери компьютер, подключи монитор и добейся загрузки системы.'},
@@ -49,7 +51,7 @@
     const assembled=task==='strip'||task==='diagnose';
     return {
       mode:'assembly', task, power:task==='diagnose', panelOpen:false, socketOpen:false,
-      monitorOn:true, monitorInput:'HDMI',
+      monitorOn:true, monitorInput:'HDMI',usb:{keyboard:null,mouse:null},
       paste:assembled?'used':'none', mains:assembled, psuSwitch:assembled,
       ...Object.fromEntries(Object.values(parts).map(part=>[part.key,assembled])),
       wiring:Object.fromEntries(Object.keys(cables).map(key=>[key,assembled&&!(task==='diagnose'&&key==='eps')])),
@@ -173,6 +175,18 @@
     return phase==='off'?'ПК выключен. Нажми Power в разделе «Питание и запуск».':post[phase].result;
   }
 
+  function completionIssue(s){
+    const missingParts=Object.keys(parts).filter(id=>!has(s,id)).map(id=>parts[id].name);
+    const missingCables=Object.keys(cables).filter(id=>!s.wiring[id]).map(id=>cables[id].name);
+    if(missingParts.length)return 'Ещё нужно установить: '+missingParts.join(', ')+'.';
+    if(missingCables.length){
+      const prefix=monitorDisplay(s).kind==='desktop'?'ПК загрузился. Для завершения сборки ещё нужны кабели: ':'Ещё нужно подключить: ';
+      return prefix+missingCables.join(', ')+'.';
+    }
+    if(display(s)!=='ready')return launchProblem(s);
+    return monitorIssue(s);
+  }
+
   function recommended(s) {
     if(s.task==='solo')return 'Самостоятельная сборка. Подсказки отключены.';
     if(s.task==='build'||s.task==='free'){
@@ -202,15 +216,14 @@
     const solo=s.task==='solo';
     function result(text,ok=true,passed,recordedAction=action) {
       if(!ok)s.errors++;
-      if(!ok&&solo&&action!=='requestHint')text=action==='finish'?'Сборка ещё не прошла проверку.':'Действие не выполнено.';
+      if(!ok&&solo&&!['finish','connectUsb','disconnectUsb'].includes(action))text='Действие не выполнено.';
       const entry={step:s.log.length+1,action:recordedAction,text,ok};
       s.log.push(entry);
       return {text,ok,passed};
     }
-    function change(text,resetStart=true) {
+    function change(text,{external=false}={}) {
       s.revision++;
-      s.complete=false;
-      if(resetStart)s.startAttempt=false;
+      if(!external){s.complete=false;s.startAttempt=false;}
       return result(text);
     }
     function inside() {
@@ -233,12 +246,27 @@
     }
     if(action==='monitorPower'){
       s.monitorOn=s.monitorOn===false;
-      return change(s.monitorOn?'Монитор включён.':'Монитор выключен.',false);
+      return change(s.monitorOn?'Монитор включён.':'Монитор выключен.',{external:true});
     }
     if(action==='monitorInput'){
       if(s.monitorOn===false)return result('Включи монитор кнопкой питания.',false);
       s.monitorInput=s.monitorInput==='DP'?'HDMI':'DP';
-      return change('Вход монитора: '+s.monitorInput+'.',false);
+      return change('Вход монитора: '+s.monitorInput+'.',{external:true});
+    }
+    if(action==='connectUsb'||action==='disconnectUsb'){
+      if(!Object.hasOwn(usbDevices,target))return result('Выбери клавиатуру или мышь.',false);
+      s.usb??={keyboard:null,mouse:null};
+      if(action==='disconnectUsb'){
+        if(!s.usb[target])return result('Устройство ещё не подключено.',false);
+        s.usb[target]=null;
+        return result('USB отключён. '+usbDevices[target]);
+      }
+      const port=Number(connector);
+      if(!has(s,'BOARD'))return result('USB-порты появятся после установки материнской платы.',false);
+      if(!usbPorts.includes(port))return result('Выбери один из задних USB-портов.',false);
+      if(Object.entries(s.usb).some(([device,used])=>device!==target&&used===port))return result('Этот USB-порт занят. Выбери свободный.',false);
+      s.usb[target]=port;
+      return result(usbDevices[target]+' → USB '+port);
     }
     if(action==='inspectCable'){
       const cable=cables[target];
@@ -249,15 +277,11 @@
     if(action==='finish'){
       if(s.task==='free')return result('В свободной сборке можно продолжать эксперимент.');
       if(s.task==='strip'){
-        if(s.mains||s.psuSwitch||s.power||!s.panelOpen||Object.keys(parts).some(id=>has(s,id))||Object.values(s.wiring).some(Boolean))return result('Разборка ещё не завершена. Отключи питание и кабели, освободив корпус от деталей.',false);
+        if(s.mains||s.psuSwitch||s.power||!s.panelOpen||Object.keys(parts).some(id=>has(s,id))||Object.values(s.wiring).some(Boolean)||Object.values(s.usb||{}).some(Boolean))return result('Разборка ещё не завершена. Отключи питание и кабели, освободив корпус от деталей.',false);
       }else{
         if(s.task==='diagnose'&&!s.observedSymptom)return result('Сначала нужно было зафиксировать исходный симптом через проверку экрана. Начни диагностику заново.',false);
-        const missingParts=Object.keys(parts).filter(id=>!has(s,id)).map(id=>parts[id].name);
-        if(missingParts.length)return result('Ещё нужно установить: '+missingParts.join(', ')+'.',false);
-        const missingCables=Object.keys(cables).filter(id=>!s.wiring[id]).map(id=>cables[id].name);
-        if(missingCables.length)return result('Ещё нужно подключить: '+missingCables.join(', ')+'.',false);
-        if(display(s)!=='ready')return result(launchProblem(s),false);
-        if(monitorIssue(s))return result(monitorIssue(s),false);
+        const issue=completionIssue(s);
+        if(issue)return result(issue,false);
         if(s.testedAt!==s.revision)checkDisplay();
       }
       s.complete=true;
@@ -277,7 +301,8 @@
         s.startAttempt=code;
         return result(solo?monitorDisplay(s).title:post[code].result,true,false);
       }
-      return result(solo?monitorDisplay(s,code).title:post[code].result,true,code==='ready');
+      const monitor=monitorDisplay(s,code);
+      return result(solo?monitor.title:monitorIssue(s)||post[code].result,true,monitor.kind==='desktop');
     }
     if(action==='connectMains'||action==='disconnectMains'){
       if(s.power||s.psuSwitch)return result('Сначала выключи ПК и выключатель блока питания.',false);
@@ -305,7 +330,7 @@
       if(installing&&!cable.needs.every(id=>has(s,id)))return result('Сначала установи оба узла для подключения кабеля.',false);
       if(s.wiring[target]===installing)return result('Положение кабеля уже совпадает с выбранным действием.',false);
       s.wiring[target]=installing;
-      return change(installing?'Кабель подключён. '+cable.name:'Кабель отсоединён. '+cable.name,target!=='monitor');
+      return change(installing?'Кабель подключён. '+cable.name:'Кабель отсоединён. '+cable.name,{external:target==='monitor'});
     }
     const match=/^(install|remove)(BOARD|CPU|COOLER|RAM|SSD|GPU|PSU|FANS)$/.exec(action);
     if(match){
@@ -318,6 +343,7 @@
         const blocked=inside();if(blocked)return blocked;
         if(!has(s,id))return result('Этот компонент уже снят.',false);
         if(Object.entries(cables).some(([key,cable])=>s.wiring[key]&&cable.needs.includes(id)))return result('Сначала отсоедини кабели, подключённые к этому узлу.',false);
+        if(id==='BOARD'&&Object.values(s.usb||{}).some(Boolean))return result('Отсоедини клавиатуру и мышь от USB перед снятием платы.',false);
         if(id==='BOARD'&&['CPU','COOLER','RAM','SSD','GPU'].some(item=>has(s,item)))return result('Сначала сними компоненты, установленные на плате.',false);
         if(id==='CPU'&&(has(s,'COOLER')||!s.socketOpen||s.paste!=='none'))return result('Сними кулер, очисти термопасту и открой фиксатор сокета.',false);
         if(id==='BOARD')s.socketOpen=false;
@@ -345,5 +371,5 @@
     return result('Это действие не предусмотрено в полной сборке.',false);
   }
 
-  return {parts,cables,tasks,post,create,has,live,display,monitorDisplay,act,recommended,installationIssue,availableMounts,nextBuildStep};
+  return {parts,cables,tasks,post,usbDevices,usbPorts,create,has,live,display,monitorDisplay,act,recommended,installationIssue,availableMounts,nextBuildStep};
 });
